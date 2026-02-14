@@ -14,17 +14,16 @@ import ReactFlow, {
   useReactFlow,
   Node,
   SelectionMode,
-  getRectOfNodes,
-  getTransformForBounds
+  Panel,
 } from 'reactflow';
-import { Bot, Layers, PlusCircle, Trash2, Mail, Box, Hand, MousePointer2, Download, Image as ImageIcon } from 'lucide-react';
+import { Layers, Trash2, Mail, Box, Hand, MousePointer2, Download, PenLine } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
 import CustomNode from './components/CustomNode';
 import CustomEdge from './components/CustomEdge';
-import AnalysisPanel from './components/AnalysisPanel';
 import QuantityModal from './components/QuantityModal';
 import ConfirmationModal from './components/ConfirmationModal';
+import NameModal from './components/NameModal';
 import { initialNodes, initialEdges, defaultEdgeOptions } from './constants';
 import { CustomNodeData, NodeType } from './types';
 
@@ -90,14 +89,17 @@ const getEdgeParams = (sourceType: NodeType, targetType: NodeType) => {
 function AppContent() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
   
   // Interaction Mode State
   const [interactionMode, setInteractionMode] = useState<'pan' | 'select'>('pan');
   
+  // Diagram Title State
+  const [diagramTitle, setDiagramTitle] = useState('Sem Título');
+  
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
+  const [isNameModalOpen, setIsNameModalOpen] = useState(false);
   
   const [pendingConnection, setPendingConnection] = useState<{
     sourceId: string;
@@ -105,7 +107,7 @@ function AppContent() {
     direction: 'right' | 'bottom';
   } | null>(null);
 
-  const { getNode, getNodes } = useReactFlow();
+  const { getNode } = useReactFlow();
 
   // Ref to store the latest version of the addNode function
   const requestConnectionRef = useRef<(sourceId: string, targetType: NodeType, direction: 'right' | 'bottom') => void>(() => {});
@@ -366,7 +368,7 @@ function AppContent() {
       },
     }).then((dataUrl) => {
       const a = document.createElement('a');
-      a.setAttribute('download', 'diagrama-microservicos.png');
+      a.setAttribute('download', `${diagramTitle.replace(/\s+/g, '-').toLowerCase()}.png`);
       a.setAttribute('href', dataUrl);
       a.click();
     }).catch((err) => {
@@ -391,6 +393,17 @@ function AppContent() {
         </div>
 
         <div className="flex items-center gap-3">
+          
+          {/* Rename Button */}
+          <button
+            onClick={() => setIsNameModalOpen(true)}
+            className="flex items-center gap-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 px-3 py-2 rounded-lg transition-colors mr-2"
+            title="Nomear Diagrama"
+          >
+            <PenLine className="w-4 h-4" />
+            <span className="text-sm font-medium hidden md:inline max-w-[150px] truncate">{diagramTitle}</span>
+          </button>
+
           {/* Interaction Mode Toggle */}
           <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700 mr-2">
             <button 
@@ -442,16 +455,6 @@ function AppContent() {
           >
             <Trash2 className="w-5 h-5" />
           </button>
-
-          <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-1"></div>
-
-          <button
-            onClick={() => setIsPanelOpen(true)}
-            className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 font-medium"
-          >
-            <Bot className="w-5 h-5 text-purple-500" />
-            <span className="hidden sm:inline">Análise IA</span>
-          </button>
         </div>
       </header>
 
@@ -477,6 +480,15 @@ function AppContent() {
           <Background color="#94a3b8" gap={24} size={1} className="opacity-20" />
           <Controls className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 fill-slate-500 dark:fill-slate-400 shadow-xl rounded-lg m-4" />
           
+          {/* Diagram Title Overlay */}
+          <Panel position="top-center" className="mt-8 pointer-events-none">
+             <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm px-6 py-2 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
+                <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 tracking-tight opacity-80">
+                  {diagramTitle}
+                </h1>
+             </div>
+          </Panel>
+
           {nodes.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
               <div className="text-center p-8 bg-white/50 dark:bg-slate-900/50 backdrop-blur rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 max-w-md">
@@ -508,13 +520,6 @@ function AppContent() {
         </div>
       </div>
 
-      <AnalysisPanel 
-        nodes={nodes} 
-        edges={edges} 
-        isOpen={isPanelOpen} 
-        onClose={() => setIsPanelOpen(false)} 
-      />
-
       <QuantityModal 
         isOpen={isModalOpen}
         onClose={() => {
@@ -524,6 +529,13 @@ function AppContent() {
         onConfirm={handleModalConfirm}
       />
       
+      <NameModal 
+        isOpen={isNameModalOpen}
+        currentName={diagramTitle}
+        onClose={() => setIsNameModalOpen(false)}
+        onConfirm={(name) => setDiagramTitle(name)}
+      />
+
       <ConfirmationModal
         isOpen={isConfirmClearOpen}
         onClose={() => setIsConfirmClearOpen(false)}
