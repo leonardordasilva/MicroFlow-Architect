@@ -36,7 +36,7 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-latest',
+      model: 'gemini-3-pro-preview',
       contents: prompt,
     });
 
