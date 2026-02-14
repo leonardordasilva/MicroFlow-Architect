@@ -1,0 +1,5 @@
+{
+  "name": "MicroFlow Architect",
+  "description": "A specialized visualization tool for microservices architecture. It renders complex service interactions, queues, and databases based on architectural definitions and uses Gemini to analyze the system flow.",
+  "requestFramePermissions": []
+}
