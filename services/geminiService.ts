@@ -2,12 +2,18 @@ import { GoogleGenAI } from "@google/genai";
 import { Node, Edge } from 'reactflow';
 import { CustomNodeData } from '../types';
 
-// Initialize the Gemini Client
-// IMPORTANT: The API key is injected via process.env.API_KEY
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: Edge[]) => {
+  // Inicialização Lazy: Apenas tenta acessar a chave quando a função é chamada.
+  // Isso previne que a aplicação trave no carregamento inicial (White Screen) se a chave não estiver configurada.
+  const apiKey = process.env.API_KEY;
+
+  if (!apiKey) {
+    throw new Error("API Key não encontrada. Configure a variável de ambiente API_KEY no painel do Netlify.");
+  }
+
   try {
+    const ai = new GoogleGenAI({ apiKey });
+
     // Construct a textual representation of the graph
     const nodeDesc = nodes.map(n => `- ${n.data.label} (${n.data.type})`).join('\n');
     const edgeDesc = edges.map(e => {
@@ -43,6 +49,7 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
     return response.text;
   } catch (error) {
     console.error("Gemini Analysis Failed:", error);
-    throw new Error("Failed to analyze architecture. Ensure API Key is valid.");
+    // Relançar o erro para que a interface possa exibir a mensagem apropriada
+    throw error;
   }
 };

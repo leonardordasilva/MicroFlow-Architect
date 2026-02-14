@@ -12,8 +12,9 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
     },
     // Define process.env para o cliente (API Key)
+    // O fallback para "" garante que o código não quebre com "process is not defined" se a variável faltar
     define: {
-      'process.env.API_KEY': JSON.stringify(env.API_KEY || process.env.API_KEY)
+      'process.env.API_KEY': JSON.stringify(env.API_KEY || process.env.API_KEY || "")
     }
   }
 })
