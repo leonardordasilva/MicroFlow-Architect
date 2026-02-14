@@ -2,12 +2,17 @@ import { GoogleGenAI } from "@google/genai";
 import { Node, Edge } from 'reactflow';
 import { CustomNodeData } from '../types';
 
-// Initialize the Gemini Client
-// IMPORTANT: The API key is injected via process.env.API_KEY
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: Edge[]) => {
   try {
+    const apiKey = process.env.API_KEY;
+    
+    if (!apiKey) {
+      throw new Error("API Key não configurada. Verifique suas variáveis de ambiente.");
+    }
+
+    // Initialize client only when needed to avoid startup crashes
+    const ai = new GoogleGenAI({ apiKey });
+
     // Construct a textual representation of the graph
     const nodeDesc = nodes.map(n => `- ${n.data.label} (${n.data.type})`).join('\n');
     const edgeDesc = edges.map(e => {
@@ -43,6 +48,7 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
     return response.text;
   } catch (error) {
     console.error("Gemini Analysis Failed:", error);
-    throw new Error("Failed to analyze architecture. Ensure API Key is valid.");
+    // Return a user-friendly error string instead of throwing, so the UI can display it
+    return `Erro na análise: ${error instanceof Error ? error.message : "Falha desconhecida"}. Verifique se a API Key está válida.`;
   }
 };
