@@ -476,6 +476,8 @@ function AppContent() {
           panOnDrag={interactionMode === 'pan'}
           selectionOnDrag={interactionMode === 'select'}
           selectionMode={SelectionMode.Partial}
+          snapToGrid={true}
+          snapGrid={[24, 24]}
         >
           <Background color="#94a3b8" gap={24} size={1} className="opacity-20" />
           <Controls className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 fill-slate-500 dark:fill-slate-400 shadow-xl rounded-lg m-4" />
