@@ -16,7 +16,7 @@ import ReactFlow, {
   SelectionMode,
   Panel,
 } from 'reactflow';
-import { Layers, Trash2, Mail, Box, Hand, MousePointer2, Download, PenLine } from 'lucide-react';
+import { Layers, Trash2, Mail, Box, Hand, MousePointer2, Download, PenLine, Sparkles } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
 import CustomNode from './components/CustomNode';
@@ -24,8 +24,10 @@ import CustomEdge from './components/CustomEdge';
 import QuantityModal from './components/QuantityModal';
 import ConfirmationModal from './components/ConfirmationModal';
 import NameModal from './components/NameModal';
+import TextToDiagramModal from './components/TextToDiagramModal';
 import { initialNodes, initialEdges, defaultEdgeOptions } from './constants';
 import { CustomNodeData, NodeType } from './types';
+import { generateDiagramFromText } from './services/geminiService';
 
 // Define custom node types
 const nodeTypes: NodeTypes = {
@@ -100,6 +102,7 @@ function AppContent() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
+  const [isTextToDiagramOpen, setIsTextToDiagramOpen] = useState(false);
   
   const [pendingConnection, setPendingConnection] = useState<{
     sourceId: string;
@@ -293,6 +296,44 @@ function AppContent() {
     setPendingConnection(null);
   };
 
+  // Generate Diagram Handler
+  const handleGenerateDiagram = async (description: string) => {
+    const { nodes: newNodes, edges: newEdges } = await generateDiagramFromText(description);
+    
+    // Inject methods into generated nodes so they work with the UI
+    const interactiveNodes = newNodes.map(n => ({
+      ...n,
+      type: 'custom', // Ensure it uses our custom node component
+      data: {
+        ...n.data,
+        onAddConnection: (t: NodeType, d: 'right' | 'bottom') => requestConnectionRef.current(n.id, t, d),
+        onLabelChange: (l: string) => onLabelChange(n.id, l),
+        onDelete: () => onDeleteNode(n.id),
+        onToggleDatabase: () => onToggleDatabase(n.id),
+      }
+    }));
+
+    // Inject styles into generated edges
+    const interactiveEdges = newEdges.map(e => {
+       const sourceNode = interactiveNodes.find(n => n.id === e.source);
+       const targetNode = interactiveNodes.find(n => n.id === e.target);
+       const params = getEdgeParams(
+         (sourceNode?.data.type as NodeType) || NodeType.SERVICE, 
+         (targetNode?.data.type as NodeType) || NodeType.SERVICE
+       );
+
+       return {
+         ...e,
+         type: 'custom',
+         markerEnd: { type: MarkerType.ArrowClosed, color: params.style.stroke },
+         ...params
+       };
+    });
+
+    setNodes(interactiveNodes);
+    setEdges(interactiveEdges);
+  };
+
 
   // Main function to add a standalone Microservice (Root)
   const addMicroservice = () => {
@@ -404,6 +445,18 @@ function AppContent() {
             <span className="text-sm font-medium hidden md:inline max-w-[150px] truncate">{diagramTitle}</span>
           </button>
 
+          {/* AI Generator Button */}
+          <button
+            onClick={() => setIsTextToDiagramOpen(true)}
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-colors mr-4 shadow-md shadow-purple-600/20 active:scale-95"
+            title="Gerar Diagrama com IA"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span className="hidden md:inline font-medium">IA Geradora</span>
+          </button>
+
+          <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-1"></div>
+
           {/* Interaction Mode Toggle */}
           <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700 mr-2">
             <button 
@@ -499,11 +552,15 @@ function AppContent() {
                 </div>
                 <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-2">Comece seu Diagrama</h3>
                 <p className="text-slate-600 dark:text-slate-400 mb-4">
-                  O canvas está vazio. Adicione componentes usando os botões acima.
+                  O canvas está vazio. Adicione componentes usando os botões acima ou use a <strong>IA Geradora</strong>.
                 </p>
-                <div className="flex gap-2 justify-center">
+                <div className="flex gap-2 justify-center items-center flex-wrap">
                     <span className="text-sm bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2 py-1 rounded">+ Fila</span>
                     <span className="text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">+ Microserviço</span>
+                    <button onClick={() => setIsTextToDiagramOpen(true)} className="text-sm bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-1 rounded hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" />
+                      Gerar com IA
+                    </button>
                 </div>
               </div>
             </div>
@@ -536,6 +593,12 @@ function AppContent() {
         currentName={diagramTitle}
         onClose={() => setIsNameModalOpen(false)}
         onConfirm={(name) => setDiagramTitle(name)}
+      />
+
+      <TextToDiagramModal 
+        isOpen={isTextToDiagramOpen}
+        onClose={() => setIsTextToDiagramOpen(false)}
+        onGenerate={handleGenerateDiagram}
       />
 
       <ConfirmationModal
