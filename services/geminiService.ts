@@ -93,7 +93,12 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
          - 'external' (Sistemas terceiros)
          - 'database' (APENAS para DBs soltos, não vinculados a um serviço específico)
 
-      Retorne APENAS o JSON cru no seguinte formato (sem markdown):
+      5. FORMATO DE SAÍDA:
+         - Retorne APENAS um objeto JSON válido.
+         - NÃO inclua comentários (// ou /* */) dentro do JSON.
+         - NÃO use trailing commas (vírgulas após o último elemento).
+
+      Exemplo de JSON esperado:
       {
         "nodes": [
           { 
@@ -118,8 +123,21 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
     });
 
     let jsonStr = response.text || "";
-    // Limpeza de segurança
-    jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    // Limpeza robusta
+    // 1. Remove markdown wrapping
+    jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
+    
+    // 2. Encontra o início e fim do objeto JSON para ignorar texto introdutório/final
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+    }
+
+    // 3. Trim final
+    jsonStr = jsonStr.trim();
 
     const result = JSON.parse(jsonStr);
     
@@ -139,6 +157,6 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
 
   } catch (error) {
     console.error("Gemini Generation Failed:", error);
-    throw error;
+    throw new Error(`Falha ao interpretar a arquitetura: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
