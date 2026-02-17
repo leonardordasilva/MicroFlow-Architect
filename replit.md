@@ -24,6 +24,8 @@ A specialized visualization tool for microservices architecture. It renders comp
 ├── constants.ts     - Initial nodes/edges and defaults
 ├── types.ts         - TypeScript type definitions
 ├── vite.config.ts   - Vite configuration (port 5000, all hosts allowed)
+├── server.ts        - Express backend for Replit production
+├── netlify.toml     - Netlify deployment config
 ├── components/      - React components
 │   ├── AnalysisPanel.tsx
 │   ├── ConfirmationModal.tsx
@@ -32,13 +34,22 @@ A specialized visualization tool for microservices architecture. It renders comp
 │   ├── NameModal.tsx
 │   ├── QuantityModal.tsx
 │   └── TextToDiagramModal.tsx
-└── services/
-    └── geminiService.ts  - Gemini AI integration
+├── services/
+│   └── geminiService.ts  - Gemini AI integration (frontend)
+└── netlify/
+    └── functions/
+        ├── analyze.ts           - Netlify serverless: architecture analysis
+        └── generate-diagram.ts  - Netlify serverless: diagram generation
 ```
+
+### Deployment Targets
+- **Replit**: Uses Vite middleware (dev) or Express server (production) on port 5000. API keys auto-configured via Replit AI Integrations.
+- **Netlify**: Uses Netlify Functions for /api/* endpoints. Requires `GEMINI_API_KEY` set in Netlify environment variables with a Google Gemini API key.
 
 ### Environment Variables
 - `AI_INTEGRATIONS_GEMINI_API_KEY` — Auto-configured by Replit AI Integrations
 - `AI_INTEGRATIONS_GEMINI_BASE_URL` — Auto-configured by Replit AI Integrations
+- `GEMINI_API_KEY` — For Netlify deployment: user's own Google Gemini API key
 - Vite injects these at build time via `process.env.API_KEY` and `process.env.GEMINI_BASE_URL`
 
 ## User Preferences
