@@ -3,13 +3,18 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "npx tsx server.ts & vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "npx tsx server.ts"
   },
   "dependencies": {
     "@google/genai": "^0.2.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "cors": "^2.8.6",
     "drizzle-zod": "^0.8.3",
+    "express": "^5.2.1",
     "html-to-image": "^1.11.11",
     "lucide-react": "^0.344.0",
     "p-limit": "^7.3.0",
@@ -18,6 +23,7 @@
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",
     "reactflow": "^11.11.4",
+    "tsx": "^4.21.0",
     "zod": "^4.3.6",
     "zod-validation-error": "^5.0.0"
   },
