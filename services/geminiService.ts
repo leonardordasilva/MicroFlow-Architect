@@ -3,11 +3,12 @@ import { Node, Edge } from 'reactflow';
 import { CustomNodeData, NodeType } from '../types';
 
 // Lista de modelos para tentar em ordem de prioridade.
-// Atualizado para usar modelos recomendados e estáveis, removendo versões que causam 404.
+// Atualizado para capturar erros 503 e tentar o próximo modelo.
 const MODELS = [
-  'gemini-2.0-flash',         // Modelo rápido e capaz (se tiver cota)
-  'gemini-3-flash-preview',   // Nova versão recomendada para tasks de texto
-  'gemini-flash-latest'       // Alias para a versão estável atual
+  'gemini-2.0-flash',
+  'gemini-3-flash-preview',
+  'gemini-flash-latest', 
+  'gemini-1.5-flash-8b' // Adicionado como fallback ultra-leve
 ];
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -30,22 +31,23 @@ const generateWithFallback = async (ai: GoogleGenAI, prompt: string, config: any
       // Verifica tipos de erro para decisão de fallback
       const isQuotaError = errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('Quota') || errMsg.includes('Too Many Requests');
       const isNotFoundError = errMsg.includes('404') || errMsg.includes('NOT_FOUND') || errMsg.includes('not found');
+      const isOverloadedError = errMsg.includes('503') || errMsg.includes('Overloaded') || errMsg.includes('Service Unavailable');
       
       // Log para debug
-      console.warn(`Falha no modelo ${model}.`, { isQuotaError, isNotFoundError, msg: errMsg });
+      console.warn(`Falha no modelo ${model}.`, { isQuotaError, isNotFoundError, isOverloadedError, msg: errMsg });
 
-      if (isQuotaError || isNotFoundError) {
-        // Se for erro de cota, espera um pouco mais para dar chance ao pool global
-        if (isQuotaError) {
-            console.log("Aguardando liberação de cota...");
-            await sleep(2000);
+      if (isQuotaError || isNotFoundError || isOverloadedError) {
+        // Se for erro de cota ou sobrecarga, espera um pouco mais
+        if (isQuotaError || isOverloadedError) {
+            console.log("Aguardando liberação de recurso...");
+            await sleep(1500);
         }
         
         // Continua para o próximo modelo da lista
         continue; 
       }
 
-      // Se for outro erro (ex: 400 Bad Request), aborta imediatamente pois trocar de modelo não resolverá
+      // Se for outro erro (ex: 400 Bad Request), aborta imediatamente
       throw error;
     }
   }

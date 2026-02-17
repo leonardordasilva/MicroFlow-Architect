@@ -33,11 +33,16 @@ const TextToDiagramModal: React.FC<TextToDiagramModalProps> = ({ isOpen, onClose
       await onGenerate(description);
       onClose();
     } catch (err: any) {
-      // Extrair mensagem de erro para verificar se é problema de cota
+      // Extrair mensagem de erro para verificar se é problema de cota ou sobrecarga
       const errorMessage = err?.message || String(err);
       
-      if (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota') || errorMessage.includes('Too Many Requests')) {
-        setError("Limite de cota da API excedido em todos os modelos tentados. Por favor, aguarde cerca de 1 minuto antes de tentar novamente.");
+      const isQuota = errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota') || errorMessage.includes('Too Many Requests');
+      const isOverloaded = errorMessage.includes('503') || errorMessage.includes('Overloaded') || errorMessage.includes('Service Unavailable');
+      
+      if (isQuota) {
+        setError("Cota excedida em todos os modelos. Aguarde 1 minuto.");
+      } else if (isOverloaded) {
+        setError("Serviço temporariamente sobrecarregado (503). Tente novamente em instantes.");
       } else {
         setError(`Falha ao gerar diagrama: ${errorMessage.substring(0, 100)}...`);
       }
