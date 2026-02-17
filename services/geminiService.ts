@@ -2,12 +2,12 @@ import { GoogleGenAI } from "@google/genai";
 import { Node, Edge } from 'reactflow';
 import { CustomNodeData, NodeType } from '../types';
 
-// Lista de modelos para tentar em ordem de prioridade (Fallback Strategy)
-// Atualizado: Removido modelo lite-preview que estava causando 404.
-// O gemini-1.5-flash é o fallback mais seguro e com maior cota.
+// Lista de modelos para tentar em ordem de prioridade.
+// Atualizado para usar modelos recomendados e estáveis, removendo versões que causam 404.
 const MODELS = [
-  'gemini-2.0-flash',
-  'gemini-1.5-flash'
+  'gemini-2.0-flash',         // Modelo rápido e capaz (se tiver cota)
+  'gemini-3-flash-preview',   // Nova versão recomendada para tasks de texto
+  'gemini-flash-latest'       // Alias para a versão estável atual
 ];
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -27,29 +27,31 @@ const generateWithFallback = async (ai: GoogleGenAI, prompt: string, config: any
       lastError = error;
       const errMsg = String(error);
       
-      // Verifica se é erro de cota (429/429 Too Many Requests) 
-      // OU se o modelo não foi encontrado (404 Not Found - comum em previews que mudam de nome)
+      // Verifica tipos de erro para decisão de fallback
       const isQuotaError = errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('Quota') || errMsg.includes('Too Many Requests');
       const isNotFoundError = errMsg.includes('404') || errMsg.includes('NOT_FOUND') || errMsg.includes('not found');
+      
+      // Log para debug
+      console.warn(`Falha no modelo ${model}.`, { isQuotaError, isNotFoundError, msg: errMsg });
 
       if (isQuotaError || isNotFoundError) {
-        console.warn(`Falha no modelo ${model} (Erro: ${isQuotaError ? 'Cota Excedida' : 'Modelo Não Encontrado'}). Tentando próximo modelo...`);
-        
-        // Se for erro de cota, faz um pequeno backoff antes de tentar o próximo
-        // Se for 404, tenta o próximo imediatamente
+        // Se for erro de cota, espera um pouco mais para dar chance ao pool global
         if (isQuotaError) {
-            await sleep(1000);
+            console.log("Aguardando liberação de cota...");
+            await sleep(2000);
         }
         
+        // Continua para o próximo modelo da lista
         continue; 
       }
 
-      // Se não for erro de infraestrutura (ex: erro de sintaxe, 400), lança imediatamente
+      // Se for outro erro (ex: 400 Bad Request), aborta imediatamente pois trocar de modelo não resolverá
       throw error;
     }
   }
 
   // Se todos falharem
+  console.error("Todos os modelos de fallback falharam.");
   throw lastError;
 };
 
