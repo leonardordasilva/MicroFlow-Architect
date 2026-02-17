@@ -2,6 +2,29 @@ import { GoogleGenAI } from "@google/genai";
 import { Node, Edge } from 'reactflow';
 import { CustomNodeData, NodeType } from '../types';
 
+// Modelo Lite para economizar cota (Free Tier Friendly)
+const MODEL_NAME = 'gemini-2.0-flash-lite-preview-02-05';
+
+// Helper para lidar com Rate Limiting (429) automaticamente
+const generateWithRetry = async (ai: GoogleGenAI, prompt: string, config: any = {}, retries = 1) => {
+  try {
+    return await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: config
+    });
+  } catch (error: any) {
+    const errMsg = String(error);
+    // Se for erro de cota, espera e tenta novamente
+    if (retries > 0 && (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('Quota'))) {
+      console.warn("Cota atingida. Retentando em 3 segundos...");
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      return generateWithRetry(ai, prompt, config, retries - 1);
+    }
+    throw error;
+  }
+};
+
 export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: Edge[]) => {
   const apiKey = process.env.API_KEY;
 
@@ -12,8 +35,6 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
   try {
     const ai = new GoogleGenAI({ apiKey });
 
-    // Construct a textual representation of the graph
-    // Agora inclui explicitamente se o serviço possui banco de dados interno na descrição textual
     const nodeDesc = nodes.map(n => `- ${n.data.label} (${n.data.type}) ${n.data.hasDatabase ? '[Possui Banco de Dados Oracle Interno]' : ''}`).join('\n');
     
     const edgeDesc = edges.map(e => {
@@ -37,13 +58,10 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
       2. Pontos de falha (SPOFs).
       3. Sugestões de melhoria.
       
-      Responda em Português (Markdown).
+      Responda em Português (Markdown).Seja conciso.
     `;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash', // Alterado para Flash para economizar cota e ser mais rápido
-      contents: prompt,
-    });
+    const response = await generateWithRetry(ai, prompt);
 
     return response.text;
   } catch (error) {
@@ -96,7 +114,7 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
       5. FORMATO DE SAÍDA:
          - Retorne APENAS um objeto JSON válido.
          - NÃO inclua comentários (// ou /* */) dentro do JSON.
-         - NÃO use trailing commas (vírgulas após o último elemento).
+         - NÃO use trailing commas.
 
       Exemplo de JSON esperado:
       {
@@ -114,21 +132,15 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
       }
     `;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash', // Alterado para Flash: Mais cota gratuita e excelente para JSON
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json"
-      }
+    const response = await generateWithRetry(ai, prompt, {
+      responseMimeType: "application/json"
     });
 
     let jsonStr = response.text || "";
     
     // Limpeza robusta
-    // 1. Remove markdown wrapping
     jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
     
-    // 2. Encontra o início e fim do objeto JSON para ignorar texto introdutório/final
     const firstBrace = jsonStr.indexOf('{');
     const lastBrace = jsonStr.lastIndexOf('}');
     
@@ -136,17 +148,15 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
       jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
     }
 
-    // 3. Trim final
     jsonStr = jsonStr.trim();
 
     const result = JSON.parse(jsonStr);
     
-    // Pós-processamento para garantir integridade
     const nodes = result.nodes.map((n: any) => ({
       ...n,
       data: { 
         ...n.data, 
-        type: n.type // Garante sincronia entre tipo do nó e dado
+        type: n.type
       }
     }));
 
