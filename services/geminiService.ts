@@ -3,8 +3,6 @@ import { Node, Edge } from 'reactflow';
 import { CustomNodeData, NodeType } from '../types';
 
 export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: Edge[]) => {
-  // Inicialização Lazy: Apenas tenta acessar a chave quando a função é chamada.
-  // Isso previne que a aplicação trave no carregamento inicial (White Screen) se a chave não estiver configurada.
   const apiKey = process.env.API_KEY;
 
   if (!apiKey) {
@@ -15,16 +13,18 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
     const ai = new GoogleGenAI({ apiKey });
 
     // Construct a textual representation of the graph
-    const nodeDesc = nodes.map(n => `- ${n.data.label} (${n.data.type}) ${n.data.hasDatabase ? '[Com Banco de Dados Interno]' : ''}`).join('\n');
+    // Agora inclui explicitamente se o serviço possui banco de dados interno na descrição textual
+    const nodeDesc = nodes.map(n => `- ${n.data.label} (${n.data.type}) ${n.data.hasDatabase ? '[Possui Banco de Dados Oracle Interno]' : ''}`).join('\n');
+    
     const edgeDesc = edges.map(e => {
       const source = nodes.find(n => n.id === e.source)?.data.label || e.source;
       const target = nodes.find(n => n.id === e.target)?.data.label || e.target;
-      return `- ${source} connects to ${target} via ${e.label || 'direct connection'}`;
+      return `- ${source} conecta para ${target} via ${e.label || 'conexão direta'}`;
     }).join('\n');
 
     const prompt = `
-      Você é um Arquiteto de Software Sênior especializado em microserviços e sistemas distribuídos.
-      Analise o seguinte diagrama de arquitetura (nodes e arestas):
+      Você é um Arquiteto de Software Sênior.
+      Analise o seguinte diagrama de arquitetura:
       
       NODES:
       ${nodeDesc}
@@ -32,24 +32,22 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
       EDGES:
       ${edgeDesc}
       
-      Por favor, forneça:
-      1. Um resumo executivo do fluxo de dados.
-      2. Pontos potenciais de falha (SPOFs) ou gargalos.
-      3. Sugestões de melhoria para resiliência ou escalabilidade.
-      4. Identifique se o padrão segue boas práticas de desacoplamento.
+      Forneça:
+      1. Resumo do fluxo.
+      2. Pontos de falha (SPOFs).
+      3. Sugestões de melhoria.
       
-      Responda em Português usando Markdown formatado. Seja conciso e técnico.
+      Responda em Português (Markdown).
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3-flash-preview', // Modelo atualizado para v3 flash
       contents: prompt,
     });
 
     return response.text;
   } catch (error) {
     console.error("Gemini Analysis Failed:", error);
-    // Relançar o erro para que a interface possa exibir a mensagem apropriada
     throw error;
   }
 };
@@ -65,60 +63,72 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
     const ai = new GoogleGenAI({ apiKey });
 
     const prompt = `
-      Você é um gerador de layout inteligente para React Flow.
-      O usuário descreveu um sistema: "${description}".
+      Atue como um gerador de diagramas de arquitetura React Flow altamente especializado.
+      Descrição do usuário: "${description}".
 
-      Sua tarefa é gerar um JSON contendo 'nodes' e 'edges' para representar esse sistema, com foco total na clareza visual e isolamento de fluxos.
+      REGRAS CRÍTICAS DE COMPORTAMENTO (Siga estritamente):
+
+      1. REGRA DE BANCO DE DADOS (Internalização):
+         - Se a descrição diz que um serviço "tem um banco", "usa oracle", "salva dados", ou algo similar:
+           NÃO crie um nó separado do tipo "database".
+         - EM VEZ DISSO: Crie o nó do serviço com a propriedade "hasDatabase": true dentro de "data".
+         - Use nós do tipo 'database' APENAS se for explicitamente um banco legado compartilhado e isolado.
+
+      2. REGRA DE ISOLAMENTO VISUAL (Duplicação de Nós REST):
+         - Objetivo: Clareza visual absoluta. O diagrama deve ser lido da esquerda para a direita sem linhas cruzando a tela inteira.
+         - Se "Serviço A" e "Serviço B" chamam o "Serviço C":
+           VOCÊ DEVE CRIAR DUAS CÓPIAS VISUAIS DO "Serviço C".
+           - Cópia 1: ID "svc_c_1", posicionado imediatamente à direita do "Serviço A".
+           - Cópia 2: ID "svc_c_2", posicionado imediatamente à direita do "Serviço B".
+         - NUNCA reutilize o mesmo nó de destino para chamadores distantes. Cada fluxo deve parecer independente.
+
+      3. LAYOUT E POSICIONAMENTO:
+         - Fluxo: Esquerda (x: 0) -> Direita (x: growing).
+         - Proximidade: O serviço chamado deve estar EXATAMENTE à direita do seu chamador (Offset X: +300px).
+         - Alinhamento Vertical: Se um serviço chama 3 outros, empilhe-os verticalmente com espaçamento de 150px no eixo Y, todos alinhados no mesmo eixo X.
       
-      Regras de Negócio:
-      1. Tipos permitidos: 'service', 'queue', 'external', 'database'.
-      2. BANCOS DE DADOS: Se um serviço tem DB próprio, use "hasDatabase": true no nó do serviço.
+      4. TIPOS DE NÓS:
+         - 'service' (Microserviços, APIs)
+         - 'queue' (Filas, Tópicos, MQ)
+         - 'external' (Sistemas terceiros)
+         - 'database' (APENAS para DBs soltos, não vinculados a um serviço específico)
 
-      Regras de Layout (CRÍTICO - ISOLAMENTO VISUAL):
-      1. NÃO REUTILIZE NÓS DE SERVIÇO (REST): 
-         - Se "Serviço A" e "Serviço B" chamam ambos o "Serviço C", você deve criar DOIS nós "Serviço C" distintos (ex: "Serviço C (A)" e "Serviço C (B)").
-         - O objetivo é evitar linhas cruzadas. Cada chamador deve ter sua própria cópia da integração ao seu lado.
-      2. FLUXO HIERÁRQUICO: Da esquerda para a direita.
-      3. PROXIMIDADE ESTRITA: O serviço chamado deve estar IMEDIATAMENTE à direita do chamador (Offset X: +250px).
-      4. ALINHAMENTO VERTICAL:
-         - Se o "Serviço A" chama 3 serviços diferentes, empilhe esses 3 serviços verticalmente à direita de A.
-      5. FILAS (Queues): Filas podem ser compartilhadas se fizer sentido lógico (ex: barramento), mas se a clareza ficar comprometida, duplique também.
-
-      Retorne APENAS o JSON cru.
-      Formato esperado:
+      Retorne APENAS o JSON cru no seguinte formato (sem markdown):
       {
         "nodes": [
           { 
-            "id": "n1", 
+            "id": "unique_id_1", 
             "type": "service", 
             "position": { "x": 0, "y": 0 }, 
-            "data": { "label": "API Gateway", "hasDatabase": false } 
+            "data": { "label": "Nome do Serviço", "hasDatabase": true, "type": "service" } 
           }
         ],
         "edges": [
-          { "id": "e1", "source": "n1", "target": "n2", "label": "REST" }
+          { "id": "e1", "source": "unique_id_1", "target": "unique_id_2", "label": "REST" }
         ]
       }
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3-pro-preview', // Modelo atualizado para v3 pro
       contents: prompt,
+      config: {
+        responseMimeType: "application/json"
+      }
     });
 
     let jsonStr = response.text || "";
-    // Limpeza básica caso venha com markdown
+    // Limpeza de segurança
     jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
 
     const result = JSON.parse(jsonStr);
     
-    // Validar e mapear para garantir conformidade com o app
+    // Pós-processamento para garantir integridade
     const nodes = result.nodes.map((n: any) => ({
       ...n,
       data: { 
         ...n.data, 
-        // Garantir que as propriedades necessárias existam para evitar erros de renderização
-        type: n.type 
+        type: n.type // Garante sincronia entre tipo do nó e dado
       }
     }));
 
@@ -129,6 +139,6 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
 
   } catch (error) {
     console.error("Gemini Generation Failed:", error);
-    throw new Error("Não foi possível gerar o diagrama. Tente detalhar mais a descrição.");
+    throw new Error("Falha ao interpretar a arquitetura. Tente simplificar ou detalhar passo a passo.");
   }
 };
