@@ -2,18 +2,29 @@ import { GoogleGenAI } from "@google/genai";
 import { Node, Edge } from 'reactflow';
 import { CustomNodeData, NodeType } from '../types';
 
-export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: Edge[]) => {
+function createAIClient(): GoogleGenAI {
   const apiKey = process.env.API_KEY;
+  const baseUrl = process.env.GEMINI_BASE_URL;
 
   if (!apiKey) {
-    throw new Error("API Key não encontrada. Configure a variável de ambiente API_KEY no painel do Netlify.");
+    throw new Error("API Key não encontrada. Configure a variável de ambiente API_KEY.");
   }
 
-  try {
-    const ai = new GoogleGenAI({ apiKey });
+  const options: any = { apiKey };
+  if (baseUrl) {
+    options.httpOptions = {
+      apiVersion: "",
+      baseUrl,
+    };
+  }
 
-    // Construct a textual representation of the graph
-    // Agora inclui explicitamente se o serviço possui banco de dados interno na descrição textual
+  return new GoogleGenAI(options);
+}
+
+export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: Edge[]) => {
+  try {
+    const ai = createAIClient();
+
     const nodeDesc = nodes.map(n => `- ${n.data.label} (${n.data.type}) ${n.data.hasDatabase ? '[Possui Banco de Dados Oracle Interno]' : ''}`).join('\n');
     
     const edgeDesc = edges.map(e => {
@@ -41,7 +52,7 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       contents: prompt,
     });
 
@@ -53,14 +64,8 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
 };
 
 export const generateDiagramFromText = async (description: string): Promise<{ nodes: Node<CustomNodeData>[], edges: Edge[] }> => {
-  const apiKey = process.env.API_KEY;
-
-  if (!apiKey) {
-    throw new Error("API Key não encontrada.");
-  }
-
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = createAIClient();
 
     const prompt = `
       Atue como um gerador de diagramas de arquitetura React Flow altamente especializado.
@@ -110,7 +115,7 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json"
@@ -118,17 +123,15 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
     });
 
     let jsonStr = response.text || "";
-    // Limpeza de segurança
     jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
 
     const result = JSON.parse(jsonStr);
     
-    // Pós-processamento para garantir integridade
     const nodes = result.nodes.map((n: any) => ({
       ...n,
       data: { 
         ...n.data, 
-        type: n.type // Garante sincronia entre tipo do nó e dado
+        type: n.type
       }
     }));
 

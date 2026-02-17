@@ -5,12 +5,13 @@ A specialized visualization tool for microservices architecture. It renders comp
 
 ## Recent Changes
 - 2026-02-17: Initial Replit setup — configured Vite for port 5000, removed CDN importmap in favor of bundled dependencies, set up deployment.
+- 2026-02-17: Integrated Replit AI Integrations for Gemini — no user API key needed, updated model to gemini-2.5-flash.
 
 ## Project Architecture
 - **Framework**: React 18 + TypeScript + Vite
 - **Styling**: Tailwind CSS (via CDN script tag)
 - **Diagram Library**: React Flow v11
-- **AI Integration**: Google Gemini (`@google/genai`) — requires `API_KEY` environment variable
+- **AI Integration**: Google Gemini (`@google/genai`) via Replit AI Integrations (no user API key needed)
 - **Export**: html-to-image for PNG export
 
 ### Directory Structure
@@ -35,7 +36,9 @@ A specialized visualization tool for microservices architecture. It renders comp
 ```
 
 ### Environment Variables
-- `API_KEY` — Google Gemini API key (optional, needed for AI features)
+- `AI_INTEGRATIONS_GEMINI_API_KEY` — Auto-configured by Replit AI Integrations
+- `AI_INTEGRATIONS_GEMINI_BASE_URL` — Auto-configured by Replit AI Integrations
+- Vite injects these at build time via `process.env.API_KEY` and `process.env.GEMINI_BASE_URL`
 
 ## User Preferences
 - Language: Portuguese (Brazilian) for UI text

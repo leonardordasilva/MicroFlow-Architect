@@ -18,7 +18,8 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
     },
     define: {
-      'process.env.API_KEY': JSON.stringify(env.API_KEY || process.env.API_KEY || "")
+      'process.env.API_KEY': JSON.stringify(env.AI_INTEGRATIONS_GEMINI_API_KEY || env.API_KEY || process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.API_KEY || ""),
+      'process.env.GEMINI_BASE_URL': JSON.stringify(env.AI_INTEGRATIONS_GEMINI_BASE_URL || process.env.AI_INTEGRATIONS_GEMINI_BASE_URL || ""),
     }
   }
 })
