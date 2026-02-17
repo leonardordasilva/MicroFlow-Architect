@@ -6,7 +6,7 @@ A specialized visualization tool for microservices architecture. It renders comp
 ## Recent Changes
 - 2026-02-17: Initial Replit setup — configured Vite for port 5000, removed CDN importmap in favor of bundled dependencies, set up deployment.
 - 2026-02-17: Integrated Replit AI Integrations for Gemini — no user API key needed, updated model to gemini-2.5-flash.
-- 2026-02-17: Added Express backend (server.ts) to proxy Gemini API calls from frontend. Frontend calls /api/* which Vite proxies to localhost:3001 in dev. In production, Express serves static files on port 5000.
+- 2026-02-17: Added Express backend (server.ts) for production and Vite API plugin for dev. Frontend calls /api/* endpoints. In dev, Vite middleware handles API calls. In production, Express serves static files + API on port 5000.
 
 ## Project Architecture
 - **Framework**: React 18 + TypeScript + Vite

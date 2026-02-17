@@ -36,8 +36,9 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
     });
 
     if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || 'Analysis failed');
+      let errMsg = 'Analysis failed';
+      try { errMsg = (await response.json()).error || errMsg; } catch {}
+      throw new Error(errMsg);
     }
 
     const data = await response.json();
@@ -104,8 +105,9 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
     });
 
     if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || 'Generation failed');
+      let errMsg = 'Generation failed';
+      try { errMsg = (await response.json()).error || errMsg; } catch {}
+      throw new Error(errMsg);
     }
 
     const data = await response.json();

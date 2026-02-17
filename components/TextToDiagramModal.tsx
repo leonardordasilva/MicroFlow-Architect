@@ -33,7 +33,7 @@ const TextToDiagramModal: React.FC<TextToDiagramModalProps> = ({ isOpen, onClose
       await onGenerate(description);
       onClose();
     } catch (err) {
-      setError("Falha ao gerar diagrama. Tente novamente ou verifique sua API Key.");
+      setError("Falha ao gerar diagrama. Tente novamente.");
     } finally {
       setIsLoading(false);
     }
