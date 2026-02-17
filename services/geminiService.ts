@@ -41,7 +41,7 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.0-flash', // Alterado para Flash para economizar cota e ser mais rápido
       contents: prompt,
     });
 
@@ -110,7 +110,7 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-2.0-flash', // Alterado para Flash: Mais cota gratuita e excelente para JSON
       contents: prompt,
       config: {
         responseMimeType: "application/json"
@@ -139,6 +139,6 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
 
   } catch (error) {
     console.error("Gemini Generation Failed:", error);
-    throw new Error("Falha ao interpretar a arquitetura. Tente simplificar ou detalhar passo a passo.");
+    throw error;
   }
 };

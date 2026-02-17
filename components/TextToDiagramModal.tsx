@@ -32,8 +32,15 @@ const TextToDiagramModal: React.FC<TextToDiagramModalProps> = ({ isOpen, onClose
     try {
       await onGenerate(description);
       onClose();
-    } catch (err) {
-      setError("Falha ao gerar diagrama. Tente novamente ou verifique sua API Key.");
+    } catch (err: any) {
+      // Extrair mensagem de erro para verificar se é problema de cota
+      const errorMessage = err?.message || String(err);
+      
+      if (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota')) {
+        setError("Limite de cota da API (Free Tier) excedido. Aguarde alguns instantes.");
+      } else {
+        setError("Falha ao gerar diagrama. Tente novamente ou verifique sua API Key.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -81,7 +88,7 @@ const TextToDiagramModal: React.FC<TextToDiagramModalProps> = ({ isOpen, onClose
               />
               
               {error && (
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex items-center gap-2">
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
                   <span className="w-1.5 h-1.5 bg-red-500 rounded-full shrink-0" />
                   {error}
                 </div>
