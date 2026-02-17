@@ -2,11 +2,11 @@ import { GoogleGenAI } from "@google/genai";
 import { Node, Edge } from 'reactflow';
 import { CustomNodeData, NodeType } from '../types';
 
-// Modelo Lite para economizar cota (Free Tier Friendly)
-const MODEL_NAME = 'gemini-2.0-flash-lite-preview-02-05';
+// Alterado para o Flash Standard (Geralmente tem cotas melhores que previews/lites)
+const MODEL_NAME = 'gemini-2.0-flash';
 
-// Helper para lidar com Rate Limiting (429) automaticamente
-const generateWithRetry = async (ai: GoogleGenAI, prompt: string, config: any = {}, retries = 1) => {
+// Helper para lidar com Rate Limiting (429) com Backoff Exponencial
+const generateWithRetry = async (ai: GoogleGenAI, prompt: string, config: any = {}, retries = 2) => {
   try {
     return await ai.models.generateContent({
       model: MODEL_NAME,
@@ -17,8 +17,11 @@ const generateWithRetry = async (ai: GoogleGenAI, prompt: string, config: any = 
     const errMsg = String(error);
     // Se for erro de cota, espera e tenta novamente
     if (retries > 0 && (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('Quota'))) {
-      console.warn("Cota atingida. Retentando em 3 segundos...");
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Delay progressivo: 4000ms, depois 8000ms
+      const delay = (3 - retries) * 4000; 
+      console.warn(`Cota atingida (${MODEL_NAME}). Retentando em ${delay/1000}s... (Tentativas restantes: ${retries})`);
+      
+      await new Promise(resolve => setTimeout(resolve, delay));
       return generateWithRetry(ai, prompt, config, retries - 1);
     }
     throw error;
@@ -58,7 +61,7 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
       2. Pontos de falha (SPOFs).
       3. Sugestões de melhoria.
       
-      Responda em Português (Markdown).Seja conciso.
+      Responda em Português (Markdown). Seja conciso.
     `;
 
     const response = await generateWithRetry(ai, prompt);
