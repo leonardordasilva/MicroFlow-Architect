@@ -3,11 +3,11 @@ import { Node, Edge } from 'reactflow';
 import { CustomNodeData, NodeType } from '../types';
 
 // Lista de modelos para tentar em ordem de prioridade (Fallback Strategy)
-// Alternar entre modelos ajuda a evitar o Rate Limit de um modelo específico
+// Atualizado: Removido modelo lite-preview que estava causando 404.
+// O gemini-1.5-flash é o fallback mais seguro e com maior cota.
 const MODELS = [
   'gemini-2.0-flash',
-  'gemini-2.0-flash-lite-preview-02-05',
-  'gemini-1.5-flash' // Fallback final para o modelo mais estável (embora as regras prefiram o 2.0/3.0, em erro crítico de cota, o 1.5 salva a UX)
+  'gemini-1.5-flash'
 ];
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -27,17 +27,24 @@ const generateWithFallback = async (ai: GoogleGenAI, prompt: string, config: any
       lastError = error;
       const errMsg = String(error);
       
-      // Verifica se é erro de cota (429) ou sobrecarga
+      // Verifica se é erro de cota (429/429 Too Many Requests) 
+      // OU se o modelo não foi encontrado (404 Not Found - comum em previews que mudam de nome)
       const isQuotaError = errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('Quota') || errMsg.includes('Too Many Requests');
+      const isNotFoundError = errMsg.includes('404') || errMsg.includes('NOT_FOUND') || errMsg.includes('not found');
 
-      if (isQuotaError) {
-        console.warn(`Falha no modelo ${model} (Cota/429). Tentando próximo modelo...`);
-        // Pequeno delay antes de tentar o próximo para dar respiro à rede
-        await sleep(1000);
+      if (isQuotaError || isNotFoundError) {
+        console.warn(`Falha no modelo ${model} (Erro: ${isQuotaError ? 'Cota Excedida' : 'Modelo Não Encontrado'}). Tentando próximo modelo...`);
+        
+        // Se for erro de cota, faz um pequeno backoff antes de tentar o próximo
+        // Se for 404, tenta o próximo imediatamente
+        if (isQuotaError) {
+            await sleep(1000);
+        }
+        
         continue; 
       }
 
-      // Se não for erro de cota (ex: erro de sintaxe, 400), lança imediatamente
+      // Se não for erro de infraestrutura (ex: erro de sintaxe, 400), lança imediatamente
       throw error;
     }
   }
