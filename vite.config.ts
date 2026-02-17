@@ -9,11 +9,14 @@ export default defineConfig(({ mode }) => {
   
   return {
     plugins: [react()],
+    server: {
+      host: '0.0.0.0',
+      port: 5000,
+      allowedHosts: true,
+    },
     build: {
       outDir: 'dist',
     },
-    // Define process.env para o cliente (API Key)
-    // O fallback para "" garante que o código não quebre com "process is not defined" se a variável faltar
     define: {
       'process.env.API_KEY': JSON.stringify(env.API_KEY || process.env.API_KEY || "")
     }
