@@ -41,7 +41,7 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview', // Modelo atualizado para v3 flash
+      model: 'gemini-2.0-flash',
       contents: prompt,
     });
 
@@ -110,7 +110,7 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview', // Modelo atualizado para v3 pro
+      model: 'gemini-2.0-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json"
