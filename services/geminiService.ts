@@ -2,30 +2,48 @@ import { GoogleGenAI } from "@google/genai";
 import { Node, Edge } from 'reactflow';
 import { CustomNodeData, NodeType } from '../types';
 
-// Alterado para o Flash Standard (Geralmente tem cotas melhores que previews/lites)
-const MODEL_NAME = 'gemini-2.0-flash';
+// Lista de modelos para tentar em ordem de prioridade (Fallback Strategy)
+// Alternar entre modelos ajuda a evitar o Rate Limit de um modelo específico
+const MODELS = [
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite-preview-02-05',
+  'gemini-1.5-flash' // Fallback final para o modelo mais estável (embora as regras prefiram o 2.0/3.0, em erro crítico de cota, o 1.5 salva a UX)
+];
 
-// Helper para lidar com Rate Limiting (429) com Backoff Exponencial
-const generateWithRetry = async (ai: GoogleGenAI, prompt: string, config: any = {}, retries = 2) => {
-  try {
-    return await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: prompt,
-      config: config
-    });
-  } catch (error: any) {
-    const errMsg = String(error);
-    // Se for erro de cota, espera e tenta novamente
-    if (retries > 0 && (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('Quota'))) {
-      // Delay progressivo: 4000ms, depois 8000ms
-      const delay = (3 - retries) * 4000; 
-      console.warn(`Cota atingida (${MODEL_NAME}). Retentando em ${delay/1000}s... (Tentativas restantes: ${retries})`);
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const generateWithFallback = async (ai: GoogleGenAI, prompt: string, config: any = {}) => {
+  let lastError: any;
+
+  for (const model of MODELS) {
+    try {
+      console.log(`Tentando modelo: ${model}`);
+      return await ai.models.generateContent({
+        model: model,
+        contents: prompt,
+        config: config
+      });
+    } catch (error: any) {
+      lastError = error;
+      const errMsg = String(error);
       
-      await new Promise(resolve => setTimeout(resolve, delay));
-      return generateWithRetry(ai, prompt, config, retries - 1);
+      // Verifica se é erro de cota (429) ou sobrecarga
+      const isQuotaError = errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('Quota') || errMsg.includes('Too Many Requests');
+
+      if (isQuotaError) {
+        console.warn(`Falha no modelo ${model} (Cota/429). Tentando próximo modelo...`);
+        // Pequeno delay antes de tentar o próximo para dar respiro à rede
+        await sleep(1000);
+        continue; 
+      }
+
+      // Se não for erro de cota (ex: erro de sintaxe, 400), lança imediatamente
+      throw error;
     }
-    throw error;
   }
+
+  // Se todos falharem
+  throw lastError;
 };
 
 export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: Edge[]) => {
@@ -64,7 +82,7 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
       Responda em Português (Markdown). Seja conciso.
     `;
 
-    const response = await generateWithRetry(ai, prompt);
+    const response = await generateWithFallback(ai, prompt);
 
     return response.text;
   } catch (error) {
@@ -135,7 +153,7 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
       }
     `;
 
-    const response = await generateWithRetry(ai, prompt, {
+    const response = await generateWithFallback(ai, prompt, {
       responseMimeType: "application/json"
     });
 
