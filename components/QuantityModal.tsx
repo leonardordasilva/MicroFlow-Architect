@@ -1,21 +1,39 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, X } from 'lucide-react';
+import { Layers, X, Box, Network } from 'lucide-react';
+import { NodeType } from '../types';
 
 interface QuantityModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (count: number) => void;
-  title?: string; // New prop for dynamic title
+  onConfirm: (count: number, isInternal: boolean) => void;
+  title?: string;
+  targetType?: NodeType;
+  sourceType?: NodeType;
 }
 
-const QuantityModal: React.FC<QuantityModalProps> = ({ isOpen, onClose, onConfirm, title = "Adicionar Microserviços" }) => {
+const QuantityModal: React.FC<QuantityModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  title = "Adicionar Componentes",
+  targetType,
+  sourceType
+}) => {
   const [count, setCount] = useState<number>(1);
+  const [isInternal, setIsInternal] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Determina se devemos mostrar a opção de escolha.
+  // Regra Exata: Origem = Serviço E Destino = Serviço.
+  // Qualquer outra combinação (ex: Fila, Banco, ou Origem Fila) esconde a opção.
+  const showLocationChoice = targetType === NodeType.SERVICE && sourceType === NodeType.SERVICE;
 
   useEffect(() => {
     if (isOpen) {
       setCount(1);
-      // Focus input after a brief delay to allow animation/rendering
+      // Reset logic: Default to External (False) everytime modal opens
+      setIsInternal(false); 
+      
       setTimeout(() => {
         inputRef.current?.focus();
         inputRef.current?.select();
@@ -26,7 +44,7 @@ const QuantityModal: React.FC<QuantityModalProps> = ({ isOpen, onClose, onConfir
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (count > 0) {
-      onConfirm(count);
+      onConfirm(count, isInternal);
       onClose();
     }
   };
@@ -50,9 +68,31 @@ const QuantityModal: React.FC<QuantityModalProps> = ({ isOpen, onClose, onConfir
         </div>
         
         <form onSubmit={handleSubmit}>
+          
+          {/* Location Choice - Restricted to Service->Service */}
+          {showLocationChoice && (
+            <div className="mb-6 grid grid-cols-2 gap-3">
+              <div 
+                onClick={() => setIsInternal(false)}
+                className={`cursor-pointer rounded-lg border p-3 flex flex-col items-center gap-2 transition-all ${!isInternal ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500'}`}
+              >
+                <Network className="w-5 h-5" />
+                <span className="text-xs font-bold">Novo Nó (Externo)</span>
+              </div>
+              
+              <div 
+                onClick={() => setIsInternal(true)}
+                className={`cursor-pointer rounded-lg border p-3 flex flex-col items-center gap-2 transition-all ${isInternal ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500'}`}
+              >
+                <Box className="w-5 h-5" />
+                <span className="text-xs font-bold">Interno (Nested)</span>
+              </div>
+            </div>
+          )}
+
           <div className="mb-6">
             <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
-              Quantidade a criar
+              Quantidade
             </label>
             <input
               ref={inputRef}
@@ -63,8 +103,11 @@ const QuantityModal: React.FC<QuantityModalProps> = ({ isOpen, onClose, onConfir
               onChange={(e) => setCount(parseInt(e.target.value) || 0)}
               className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-center font-bold text-lg"
             />
-            <p className="text-xs text-slate-500 mt-2">
-              Os itens serão distribuídos automaticamente.
+            <p className="text-xs text-slate-500 mt-2 text-center">
+              {isInternal 
+                ? "Os componentes serão criados DENTRO do nó atual."
+                : "Os nós serão distribuídos automaticamente no canvas."
+              }
             </p>
           </div>
 

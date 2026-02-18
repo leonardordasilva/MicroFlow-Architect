@@ -15,8 +15,10 @@ import ReactFlow, {
   Node,
   SelectionMode,
   Panel,
+  ConnectionMode,
+  NodeDragHandler,
 } from 'reactflow';
-import { Layers, Trash2, Mail, Box, Hand, MousePointer2, Download, PenLine, Sparkles, LayoutTemplate } from 'lucide-react';
+import { Layers, Trash2, Mail, Box, Hand, MousePointer2, Download, PenLine, Sparkles, LayoutTemplate, Undo2, Redo2 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
 import CustomNode from './components/CustomNode';
@@ -26,7 +28,7 @@ import ConfirmationModal from './components/ConfirmationModal';
 import NameModal from './components/NameModal';
 import TextToDiagramModal from './components/TextToDiagramModal';
 import { initialNodes, initialEdges, defaultEdgeOptions } from './constants';
-import { CustomNodeData, NodeType, InternalDatabase } from './types';
+import { CustomNodeData, NodeType, InternalDatabase, InternalService } from './types';
 import { generateDiagramFromText } from './services/geminiService';
 import { getLayoutedElements } from './services/layoutService';
 
@@ -43,40 +45,13 @@ const edgeTypes: EdgeTypes = {
 // Simple ID generator
 const generateId = () => `node_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 const generateDbId = () => `db_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+const generateSvcId = () => `svc_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
-// Helper to get smart handles to separate queues from rest services
-const getSmartHandleConfig = (layoutDir: string, targetType: NodeType) => {
-  // Logic: 
-  // - REST services continue on the main axis.
-  // - Queues branch off on the cross axis (90 degrees).
-
-  const isQueue = targetType === NodeType.QUEUE;
-
-  switch (layoutDir) {
-    case 'LR': // Horizontal (Left -> Right)
-      return {
-        sourceHandle: isQueue ? 's-bottom' : 's-right',
-        targetHandle: isQueue ? 't-top' : 't-left',
-      };
-    case 'TB': // Vertical (Top -> Bottom)
-      return {
-        sourceHandle: isQueue ? 's-right' : 's-bottom',
-        targetHandle: isQueue ? 't-left' : 't-top',
-      };
-    case 'RL': // Horizontal Reverse (Right -> Left)
-      return {
-        sourceHandle: isQueue ? 's-top' : 's-left',
-        targetHandle: isQueue ? 't-bottom' : 't-right',
-      };
-    case 'BT': // Vertical Reverse (Bottom -> Top)
-      return {
-        sourceHandle: isQueue ? 's-left' : 's-top',
-        targetHandle: isQueue ? 't-right' : 't-bottom',
-      };
-    default:
-      return { sourceHandle: null, targetHandle: null };
-  }
-};
+// History Interface
+interface HistoryState {
+  nodes: Node<CustomNodeData>[];
+  edges: Edge[];
+}
 
 // Helper to determine edge style based on SOURCE and TARGET types
 const getEdgeParams = (sourceType: NodeType, targetType: NodeType) => {
@@ -128,6 +103,10 @@ function AppContent() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   
+  // History State
+  const [past, setPast] = useState<HistoryState[]>([]);
+  const [future, setFuture] = useState<HistoryState[]>([]);
+
   // Interaction Mode State
   const [interactionMode, setInteractionMode] = useState<'pan' | 'select'>('pan');
   
@@ -145,18 +124,78 @@ function AppContent() {
   
   const [pendingConnection, setPendingConnection] = useState<{
     sourceId: string;
+    sourceType: NodeType; // Add sourceType to context
     targetType: NodeType;
     direction: 'right' | 'bottom';
   } | null>(null);
 
   const { getNode, fitView } = useReactFlow();
 
+  // --- HISTORY MANAGEMENT ---
+
+  const takeSnapshot = useCallback(() => {
+    setPast((oldPast) => {
+      // Limit history size to prevent memory issues (e.g., 50 steps)
+      const newPast = [...oldPast, { nodes, edges }];
+      if (newPast.length > 50) newPast.shift();
+      return newPast;
+    });
+    setFuture([]);
+  }, [nodes, edges]);
+
+  const undo = useCallback(() => {
+    if (past.length === 0) return;
+
+    const previous = past[past.length - 1];
+    const newPast = past.slice(0, past.length - 1);
+
+    setPast(newPast);
+    setFuture((oldFuture) => [{ nodes, edges }, ...oldFuture]);
+
+    setNodes(previous.nodes);
+    setEdges(previous.edges);
+  }, [past, nodes, edges, setNodes, setEdges]);
+
+  const redo = useCallback(() => {
+    if (future.length === 0) return;
+
+    const next = future[0];
+    const newFuture = future.slice(1);
+
+    setPast((oldPast) => [...oldPast, { nodes, edges }]);
+    setFuture(newFuture);
+
+    setNodes(next.nodes);
+    setEdges(next.edges);
+  }, [future, nodes, edges, setNodes, setEdges]);
+
+  // Keyboard Shortcuts for Undo/Redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        undo();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
+
+
   // Ref to store the latest version of the addNode function
   const requestConnectionRef = useRef<(sourceId: string, targetType: NodeType, direction: 'right' | 'bottom') => void>(() => {});
+
+  // --- EVENT HANDLERS WITH SNAPSHOTS ---
 
   // Handler for manual connections (drawing lines between nodes)
   const onConnect = useCallback(
     (params: Connection) => {
+      takeSnapshot(); // Snapshot before connecting
+
       const sourceNode = getNode(params.source!);
       const targetNode = getNode(params.target!);
 
@@ -165,28 +204,27 @@ function AppContent() {
       
       const edgeParams = getEdgeParams(sourceType, targetType);
 
-      // Auto-assign smart handle if dragging generically (handle is null or default)
-      let finalParams = { ...params };
-      if (!params.sourceHandle || !params.targetHandle) {
-         const smartHandles = getSmartHandleConfig(currentLayoutDir, targetType);
-         finalParams.sourceHandle = smartHandles.sourceHandle || params.sourceHandle;
-         finalParams.targetHandle = smartHandles.targetHandle || params.targetHandle;
-      }
-
       const newEdge = {
-        ...finalParams,
+        ...params, // Use the handles selected by the user
         type: 'custom', // Use our custom edge
-        markerEnd: { type: MarkerType.ArrowClosed, color: edgeParams.style.stroke },
+        markerEnd: { type: MarkerType.ArrowClosed, color: edgeParams.style.stroke }, // Ensure arrow points to target
         ...edgeParams,
+        data: { labelX: 0, labelY: 0 } // Initialize label offset
       };
 
       setEdges((eds) => addEdge(newEdge, eds));
     },
-    [setEdges, getNode, currentLayoutDir],
+    [setEdges, getNode, takeSnapshot],
   );
 
-  // Auto Layout Handler - Cycles through directions and fixes handles
+  // Snapshot on Node Drag Start (Save position before moving)
+  const onNodeDragStart: NodeDragHandler = useCallback(() => {
+    takeSnapshot();
+  }, [takeSnapshot]);
+
+  // Auto Layout Handler
   const onLayout = useCallback(() => {
+    takeSnapshot();
     // Cycle: LR -> TB -> RL -> BT -> LR
     const directions = ['LR', 'TB', 'RL', 'BT'];
     const currentIndex = directions.indexOf(currentLayoutDir);
@@ -207,22 +245,8 @@ function AppContent() {
       nextDirection
     );
 
-    // FIX HANDLES based on new direction
-    const fixedEdges = layoutedEdges.map(edge => {
-        const targetNode = layoutedNodes.find(n => n.id === edge.target);
-        if (targetNode) {
-            const smartHandles = getSmartHandleConfig(nextDirection, targetNode.data.type as NodeType);
-            return {
-                ...edge,
-                sourceHandle: smartHandles.sourceHandle,
-                targetHandle: smartHandles.targetHandle
-            };
-        }
-        return edge;
-    });
-
     setNodes([...layoutedNodes]);
-    setEdges([...fixedEdges]);
+    setEdges([...layoutedEdges]);
     setCurrentLayoutDir(nextDirection);
 
     setTimeout(() => {
@@ -230,10 +254,11 @@ function AppContent() {
             fitView({ padding: 0.3, duration: 800 });
         });
     }, 10);
-  }, [nodes, edges, currentLayoutDir, setNodes, setEdges, fitView]);
+  }, [nodes, edges, currentLayoutDir, setNodes, setEdges, fitView, takeSnapshot]);
 
   // Updates node label
   const onLabelChange = useCallback((id: string, newLabel: string) => {
+    takeSnapshot();
     setNodes((nds) => 
       nds.map((node) => {
         if (node.id === id) {
@@ -245,10 +270,11 @@ function AppContent() {
         return node;
       })
     );
-  }, [setNodes]);
+  }, [setNodes, takeSnapshot]);
 
   // Rename Internal Database
   const onRenameDatabase = useCallback((nodeId: string, dbId: string, newLabel: string) => {
+    takeSnapshot();
     setNodes((nds) => 
       nds.map((node) => {
         if (node.id === nodeId && node.data.databases) {
@@ -263,10 +289,11 @@ function AppContent() {
         return node;
       })
     );
-  }, [setNodes]);
+  }, [setNodes, takeSnapshot]);
 
   // Delete Internal Database
   const onDeleteDatabase = useCallback((nodeId: string, dbId: string) => {
+    takeSnapshot();
     setNodes((nds) => 
       nds.map((node) => {
         if (node.id === nodeId && node.data.databases) {
@@ -283,10 +310,51 @@ function AppContent() {
         return node;
       })
     );
-  }, [setNodes]);
+  }, [setNodes, takeSnapshot]);
+
+  // Rename Internal Service
+  const onRenameService = useCallback((nodeId: string, svcId: string, newLabel: string) => {
+    takeSnapshot();
+    setNodes((nds) => 
+      nds.map((node) => {
+        if (node.id === nodeId && node.data.services) {
+          const newSvcs = node.data.services.map(svc => 
+            svc.id === svcId ? { ...svc, label: newLabel } : svc
+          );
+          return {
+            ...node,
+            data: { ...node.data, services: newSvcs }
+          };
+        }
+        return node;
+      })
+    );
+  }, [setNodes, takeSnapshot]);
+
+  // Delete Internal Service
+  const onDeleteService = useCallback((nodeId: string, svcId: string) => {
+    takeSnapshot();
+    setNodes((nds) => 
+      nds.map((node) => {
+        if (node.id === nodeId && node.data.services) {
+          const newSvcs = node.data.services.filter(svc => svc.id !== svcId);
+          return {
+            ...node,
+            data: { 
+              ...node.data, 
+              services: newSvcs,
+            }
+          };
+        }
+        return node;
+      })
+    );
+  }, [setNodes, takeSnapshot]);
+
 
   // Toggles internal database state (Adding 1 default DB)
   const onToggleDatabase = useCallback((id: string) => {
+    takeSnapshot();
     setNodes((nds) => 
       nds.map((node) => {
         if (node.id === id) {
@@ -310,13 +378,14 @@ function AppContent() {
         return node;
       })
     );
-  }, [setNodes]);
+  }, [setNodes, takeSnapshot]);
 
   // Deletes a node
   const onDeleteNode = useCallback((id: string) => {
+    takeSnapshot();
     setNodes((nds) => nds.filter((n) => n.id !== id));
     setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
-  }, [setNodes, setEdges]);
+  }, [setNodes, setEdges, takeSnapshot]);
 
   // ACTUAL LOGIC TO CREATE NODES
   const createNodesAndEdges = useCallback((sourceId: string, targetType: NodeType, direction: 'right' | 'bottom', count: number = 1) => {
@@ -327,9 +396,7 @@ function AppContent() {
 
     if (!sourceNode) return;
 
-    const sourceType = sourceNode.data.type;
     const newNodes: Node<CustomNodeData>[] = [];
-    const newEdges: Edge[] = [];
     
     // Spacing configuration
     const horizontalGap = 220;
@@ -368,47 +435,41 @@ function AppContent() {
             label, 
             type: targetType,
             databases: [], // Init empty
+            services: [],
             onAddConnection: (t, d) => requestConnectionRef.current(newId, t, d),
             onLabelChange: (l) => onLabelChange(newId, l),
             onDelete: () => onDeleteNode(newId),
             onToggleDatabase: () => onToggleDatabase(newId),
             onRenameDatabase: (dbId, val) => onRenameDatabase(newId, dbId, val),
             onDeleteDatabase: (dbId) => onDeleteDatabase(newId, dbId),
+            onRenameService: (svcId, val) => onRenameService(newId, svcId, val),
+            onDeleteService: (svcId) => onDeleteService(newId, svcId),
           },
         };
 
-        const edgeParams = getEdgeParams(sourceType, targetType);
-        const smartHandles = getSmartHandleConfig(currentLayoutDir, targetType);
-
-        const newEdge = {
-          id: `e_${sourceId}-${newId}`,
-          source: sourceId,
-          target: newId,
-          sourceHandle: smartHandles.sourceHandle,
-          targetHandle: smartHandles.targetHandle,
-          type: 'custom', 
-          markerEnd: { type: MarkerType.ArrowClosed, color: edgeParams.style.stroke },
-          ...edgeParams
-        };
-
         newNodes.push(newNode);
-        newEdges.push(newEdge);
+        // NO EDGE CREATION HERE (as per user request)
     }
 
     setNodes((nds) => nds.concat(newNodes));
-    setEdges((eds) => eds.concat(newEdges));
-  }, [getNode, nodes, setNodes, setEdges, onLabelChange, onDeleteNode, onToggleDatabase, onRenameDatabase, onDeleteDatabase, currentLayoutDir]);
+  }, [getNode, nodes, setNodes, onLabelChange, onDeleteNode, onToggleDatabase, onRenameDatabase, onDeleteDatabase, onRenameService, onDeleteService]);
 
 
   // ENTRY POINT FROM NODE COMPONENT
   const handleRequestConnection = useCallback((sourceId: string, targetType: NodeType, direction: 'right' | 'bottom') => {
+    takeSnapshot();
+    
+    // Determine source type for logic in Modal
+    const sourceNode = getNode(sourceId) || nodes.find(n => n.id === sourceId);
+    const sourceType = sourceNode?.data?.type || NodeType.SERVICE;
+
     if (targetType === NodeType.SERVICE || targetType === NodeType.DATABASE) {
-      setPendingConnection({ sourceId, targetType, direction });
+      setPendingConnection({ sourceId, sourceType, targetType, direction });
       setIsModalOpen(true);
     } else {
       createNodesAndEdges(sourceId, targetType, direction, 1);
     }
-  }, [createNodesAndEdges]);
+  }, [createNodesAndEdges, takeSnapshot, getNode, nodes]);
 
 
   // Update the ref whenever the handler logic updates
@@ -418,36 +479,57 @@ function AppContent() {
 
 
   // Modal Confirmation Handler
-  const handleModalConfirm = (count: number) => {
+  const handleModalConfirm = (count: number, isInternal: boolean) => {
     if (pendingConnection) {
-      if (pendingConnection.targetType === NodeType.DATABASE) {
-        setNodes((nds) => nds.map((node) => {
-          if (node.id === pendingConnection.sourceId) {
-            const newDbs: InternalDatabase[] = Array.from({ length: count }).map((_, i) => ({
-                id: generateDbId(),
-                label: `Oracle DB ${i + 1}`
-            }));
-            
-            const existingDbs = node.data.databases || [];
+      
+      const { sourceId, targetType, direction } = pendingConnection;
 
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                hasDatabase: true, // Legacy flag
-                databases: [...existingDbs, ...newDbs]
-              }
-            };
+      // Logic for Internal Addition (Nested)
+      // Conditions:
+      // 1. Target is DATABASE (Always internal in current default, but kept logic here)
+      // 2. Target is SERVICE AND user selected Internal
+      if (targetType === NodeType.DATABASE || (targetType === NodeType.SERVICE && isInternal)) {
+        setNodes((nds) => nds.map((node) => {
+          if (node.id === sourceId) {
+            
+            // Adding Databases
+            if (targetType === NodeType.DATABASE) {
+                const newDbs: InternalDatabase[] = Array.from({ length: count }).map((_, i) => ({
+                    id: generateDbId(),
+                    label: `Oracle DB ${i + 1}`
+                }));
+                const existingDbs = node.data.databases || [];
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    hasDatabase: true, 
+                    databases: [...existingDbs, ...newDbs]
+                  }
+                };
+            }
+            
+            // Adding Services (Nested)
+            if (targetType === NodeType.SERVICE) {
+                const newSvcs: InternalService[] = Array.from({ length: count }).map((_, i) => ({
+                    id: generateSvcId(),
+                    label: `Service ${i + 1}`
+                }));
+                const existingSvcs = node.data.services || [];
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    services: [...existingSvcs, ...newSvcs]
+                  }
+                };
+            }
           }
           return node;
         }));
       } else {
-        createNodesAndEdges(
-          pendingConnection.sourceId, 
-          pendingConnection.targetType, 
-          pendingConnection.direction, 
-          count
-        );
+        // Logic for External Addition (New Node)
+        createNodesAndEdges(sourceId, targetType, direction, count);
       }
     }
     setIsModalOpen(false);
@@ -458,6 +540,7 @@ function AppContent() {
   const processGeneratedElements = (newNodes: Node<CustomNodeData>[], newEdges: Edge[]) => {
       const interactiveNodes = newNodes.map(n => {
         let databases: InternalDatabase[] = [];
+        let services: InternalService[] = [];
 
         if (n.data.databases && Array.isArray(n.data.databases) && n.data.databases.length > 0) {
           databases = n.data.databases.map((db: any) => ({
@@ -467,6 +550,13 @@ function AppContent() {
         } else if (n.data.hasDatabase) {
           databases = [{ id: generateDbId(), label: 'Oracle DB' }];
         }
+        
+        if (n.data.services && Array.isArray(n.data.services) && n.data.services.length > 0) {
+           services = n.data.services.map((svc: any) => ({
+              id: svc.id || generateSvcId(),
+              label: svc.label || 'Internal Service'
+           }));
+        }
 
         return {
           ...n,
@@ -474,12 +564,15 @@ function AppContent() {
           data: {
               ...n.data,
               databases: databases,
+              services: services,
               onAddConnection: (t: NodeType, d: 'right' | 'bottom') => requestConnectionRef.current(n.id, t, d),
               onLabelChange: (l: string) => onLabelChange(n.id, l),
               onDelete: () => onDeleteNode(n.id),
               onToggleDatabase: () => onToggleDatabase(n.id),
               onRenameDatabase: (dbId: string, val: string) => onRenameDatabase(n.id, dbId, val),
               onDeleteDatabase: (dbId: string) => onDeleteDatabase(n.id, dbId),
+              onRenameService: (svcId: string, val: string) => onRenameService(n.id, svcId, val),
+              onDeleteService: (svcId: string) => onDeleteService(n.id, svcId),
           }
         };
       });
@@ -496,7 +589,8 @@ function AppContent() {
           ...e,
           type: 'custom',
           markerEnd: { type: MarkerType.ArrowClosed, color: params.style.stroke },
-          ...params
+          ...params,
+          data: { labelX: 0, labelY: 0 }
         };
       });
 
@@ -505,6 +599,7 @@ function AppContent() {
 
   // Generate Diagram Handler (Text)
   const handleGenerateDiagram = async (description: string) => {
+    takeSnapshot();
     const { nodes: newNodes, edges: newEdges } = await generateDiagramFromText(description);
     const { interactiveNodes, interactiveEdges } = processGeneratedElements(newNodes, newEdges);
 
@@ -520,21 +615,8 @@ function AppContent() {
       setTimeout(() => {
           const layouted = getLayoutedElements(currentNodes, currentEdges, 'LR');
           
-          const fixedEdges = layouted.edges.map(edge => {
-              const targetNode = layouted.nodes.find(n => n.id === edge.target);
-               if (targetNode) {
-                  const smartHandles = getSmartHandleConfig('LR', targetNode.data.type as NodeType);
-                  return {
-                      ...edge,
-                      sourceHandle: smartHandles.sourceHandle,
-                      targetHandle: smartHandles.targetHandle
-                  };
-              }
-              return edge;
-          });
-
           setNodes([...layouted.nodes]);
-          setEdges([...fixedEdges]);
+          setEdges([...currentEdges]); // Edges don't change logic anymore
           setCurrentLayoutDir('LR');
           window.requestAnimationFrame(() => fitView({ padding: 0.3, duration: 800 }));
       }, 100);
@@ -542,6 +624,7 @@ function AppContent() {
 
 
   const addMicroservice = () => {
+    takeSnapshot();
     const id = generateId();
     const position = { 
       x: 250 + Math.random() * 50, 
@@ -556,12 +639,15 @@ function AppContent() {
         label: 'Microserviço', 
         type: NodeType.SERVICE,
         databases: [],
+        services: [],
         onAddConnection: (t, d) => requestConnectionRef.current(id, t, d),
         onLabelChange: (l) => onLabelChange(id, l),
         onDelete: () => onDeleteNode(id),
         onToggleDatabase: () => onToggleDatabase(id),
         onRenameDatabase: (dbId, val) => onRenameDatabase(id, dbId, val),
         onDeleteDatabase: (dbId) => onDeleteDatabase(id, dbId),
+        onRenameService: (svcId, val) => onRenameService(id, svcId, val),
+        onDeleteService: (svcId) => onDeleteService(id, svcId),
       },
     };
 
@@ -569,6 +655,7 @@ function AppContent() {
   };
 
   const addQueue = () => {
+    takeSnapshot();
     const id = generateId();
     const position = { 
       x: 250 + Math.random() * 50, 
@@ -583,6 +670,7 @@ function AppContent() {
         label: 'IBM MQ', 
         type: NodeType.QUEUE,
         databases: [],
+        services: [],
         onAddConnection: (t, d) => requestConnectionRef.current(id, t, d),
         onLabelChange: (l) => onLabelChange(id, l),
         onDelete: () => onDeleteNode(id),
@@ -593,9 +681,10 @@ function AppContent() {
   };
 
   const handleClearConfirm = useCallback(() => {
+    takeSnapshot();
     setNodes([]);
     setEdges([]);
-  }, [setNodes, setEdges]);
+  }, [setNodes, setEdges, takeSnapshot]);
 
 
   const handleDownloadImage = () => {
@@ -645,6 +734,28 @@ function AppContent() {
 
         <div className="flex items-center gap-3">
           
+          {/* Undo/Redo Buttons */}
+          <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700 mr-2">
+            <button 
+              onClick={undo}
+              disabled={past.length === 0}
+              className={`p-1.5 rounded-md transition-colors ${past.length === 0 ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-slate-700 shadow-sm'}`}
+              title="Desfazer (Ctrl+Z)"
+            >
+              <Undo2 className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={redo}
+              disabled={future.length === 0}
+              className={`p-1.5 rounded-md transition-colors ${future.length === 0 ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-slate-700 shadow-sm'}`}
+              title="Refazer (Ctrl+Y)"
+            >
+              <Redo2 className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-1"></div>
+
           {/* Rename Button */}
           <button
             onClick={() => setIsNameModalOpen(true)}
@@ -740,6 +851,7 @@ function AppContent() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodeDragStart={onNodeDragStart}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           defaultEdgeOptions={{ ...defaultEdgeOptions, type: 'custom' }}
@@ -753,6 +865,7 @@ function AppContent() {
           selectionMode={SelectionMode.Partial}
           snapToGrid={true}
           snapGrid={[24, 24]}
+          connectionMode={ConnectionMode.Loose}
         >
           <Background color="#94a3b8" gap={24} size={1} className="opacity-20" />
           <Controls className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 fill-slate-500 dark:fill-slate-400 shadow-xl rounded-lg m-4" />
@@ -797,6 +910,8 @@ function AppContent() {
           <div className="flex items-center gap-2"><div className="w-8 h-0.5 bg-emerald-500 border-t border-dashed"></div><span className="text-slate-700 dark:text-slate-300">MQ (Verde)</span></div>
           <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 italic text-slate-500">
             * Passe o mouse na conexão para remover
+            <br />
+            * Arraste o label da conexão para mover
           </div>
         </div>
       </div>
@@ -809,6 +924,8 @@ function AppContent() {
         }}
         onConfirm={handleModalConfirm}
         title={getModalTitle()}
+        targetType={pendingConnection?.targetType}
+        sourceType={pendingConnection?.sourceType}
       />
       
       <NameModal 

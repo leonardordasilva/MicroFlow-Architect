@@ -12,14 +12,21 @@ export interface InternalDatabase {
   label: string;
 }
 
+export interface InternalService {
+  id: string;
+  label: string;
+}
+
 export interface CustomNodeData {
   label: string;
   type: NodeType;
   details?: string;
-  // New: List of individual internal databases
+  // List of individual internal databases
   databases?: InternalDatabase[]; 
+  // List of individual internal services
+  services?: InternalService[];
   
-  // Deprecated (kept for temporary compat if needed, but logic will move to 'databases' array)
+  // Deprecated (kept for temporary compat if needed)
   hasDatabase?: boolean; 
   databaseCount?: number; 
 
@@ -33,6 +40,10 @@ export interface CustomNodeData {
   // Callbacks for internal databases
   onRenameDatabase?: (dbId: string, newLabel: string) => void;
   onDeleteDatabase?: (dbId: string) => void;
+  
+  // Callbacks for internal services
+  onRenameService?: (svcId: string, newLabel: string) => void;
+  onDeleteService?: (svcId: string) => void;
   
   // Callback to toggle internal database (Legacy/Shortcut)
   onToggleDatabase?: () => void;
