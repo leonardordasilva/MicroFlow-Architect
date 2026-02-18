@@ -67,7 +67,7 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
   try {
     const ai = new GoogleGenAI({ apiKey });
 
-    const nodeDesc = nodes.map(n => `- ${n.data.label} (${n.data.type}) ${n.data.hasDatabase ? '[Possui Banco de Dados Oracle Interno]' : ''}`).join('\n');
+    const nodeDesc = nodes.map(n => `- ${n.data.label} (${n.data.type}) ${n.data.databases?.length ? `[Possui ${n.data.databases.length} Bancos de Dados Internos]` : ''}`).join('\n');
     
     const edgeDesc = edges.map(e => {
       const source = nodes.find(n => n.id === e.source)?.data.label || e.source;
@@ -118,11 +118,14 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
 
       REGRAS CRÍTICAS DE COMPORTAMENTO (Siga estritamente):
 
-      1. REGRA DE BANCO DE DADOS (Internalização):
-         - Se a descrição diz que um serviço "tem um banco", "usa oracle", "salva dados", ou algo similar:
-           NÃO crie um nó separado do tipo "database".
-         - EM VEZ DISSO: Crie o nó do serviço com a propriedade "hasDatabase": true dentro de "data".
-         - Use nós do tipo 'database' APENAS se for explicitamente um banco legado compartilhado e isolado.
+      1. REGRA DE BANCO DE DADOS (Internalização e Quantidade):
+         - Se a descrição diz que um serviço "tem um banco", "usa oracle", "salva dados":
+           NÃO crie um nó separado do tipo "database". O banco deve ser interno.
+         - QUANTIDADE: Se o usuário disser "tem 2 bancos", "possui 3 bases de dados", etc:
+           Você deve preencher a propriedade "databases" dentro de "data".
+           Esta propriedade deve ser um ARRAY de objetos.
+           Exemplo para 2 bancos: "databases": [{ "id": "db_1", "label": "DB Vendas" }, { "id": "db_2", "label": "DB Log" }]
+         - Se a quantidade não for especificada, mas disser que tem banco, crie um array com 1 objeto padrão.
 
       2. REGRA DE ISOLAMENTO VISUAL (Duplicação de Nós REST):
          - Objetivo: Clareza visual absoluta. O diagrama deve ser lido da esquerda para a direita sem linhas cruzando a tela inteira.
@@ -155,7 +158,14 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
             "id": "unique_id_1", 
             "type": "service", 
             "position": { "x": 0, "y": 0 }, 
-            "data": { "label": "Nome do Serviço", "hasDatabase": true, "type": "service" } 
+            "data": { 
+                "label": "Nome do Serviço", 
+                "type": "service",
+                "databases": [
+                    { "id": "db_gen_1", "label": "Oracle Primary" },
+                    { "id": "db_gen_2", "label": "Redis Cache" }
+                ]
+            } 
           }
         ],
         "edges": [

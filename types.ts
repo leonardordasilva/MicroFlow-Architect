@@ -7,18 +7,34 @@ export enum NodeType {
   EXTERNAL = 'external'
 }
 
+export interface InternalDatabase {
+  id: string;
+  label: string;
+}
+
 export interface CustomNodeData {
   label: string;
   type: NodeType;
   details?: string;
-  hasDatabase?: boolean; // New: Indicates if the service has an internal DB
+  // New: List of individual internal databases
+  databases?: InternalDatabase[]; 
+  
+  // Deprecated (kept for temporary compat if needed, but logic will move to 'databases' array)
+  hasDatabase?: boolean; 
+  databaseCount?: number; 
+
   // Callback to trigger adding a connected node from the toolbar
   onAddConnection?: (type: NodeType, direction: 'right' | 'bottom', count?: number) => void;
   // Callback to rename the node
   onLabelChange?: (newLabel: string) => void;
   // Callback to delete the node
   onDelete?: () => void;
-  // Callback to toggle internal database
+  
+  // Callbacks for internal databases
+  onRenameDatabase?: (dbId: string, newLabel: string) => void;
+  onDeleteDatabase?: (dbId: string) => void;
+  
+  // Callback to toggle internal database (Legacy/Shortcut)
   onToggleDatabase?: () => void;
 }
 

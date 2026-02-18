@@ -1,12 +1,16 @@
 import React, { memo, useState, useRef, useEffect } from 'react';
 import { Handle, Position, NodeProps, NodeToolbar } from 'reactflow';
-import { Database, Mail, Box, Globe, ArrowRight, Trash2, Edit3, PlusSquare } from 'lucide-react';
+import { Database, Mail, Box, Globe, ArrowRight, Trash2, Edit3, PlusSquare, X } from 'lucide-react';
 import { CustomNodeData, NodeType } from '../types';
 
 const CustomNode = ({ data, selected, id }: NodeProps<CustomNodeData>) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [editingDbId, setEditingDbId] = useState<string | null>(null); // Track which DB is being edited
   const [label, setLabel] = useState(data.label);
+  const [dbLabel, setDbLabel] = useState(""); 
+  
   const inputRef = useRef<HTMLInputElement>(null);
+  const dbInputRef = useRef<HTMLInputElement>(null);
 
   // Sync internal state if prop changes externally
   useEffect(() => {
@@ -20,6 +24,13 @@ const CustomNode = ({ data, selected, id }: NodeProps<CustomNodeData>) => {
     }
   }, [isEditing]);
 
+  useEffect(() => {
+    if (editingDbId && dbInputRef.current) {
+      dbInputRef.current.focus();
+      dbInputRef.current.select();
+    }
+  }, [editingDbId]);
+
   const onSubmitLabel = () => {
     setIsEditing(false);
     if (data.onLabelChange && label.trim() !== "") {
@@ -29,12 +40,27 @@ const CustomNode = ({ data, selected, id }: NodeProps<CustomNodeData>) => {
     }
   };
 
+  const onSubmitDbLabel = () => {
+    if (editingDbId && data.onRenameDatabase && dbLabel.trim() !== "") {
+        data.onRenameDatabase(editingDbId, dbLabel);
+    }
+    setEditingDbId(null);
+  };
+
   const handleKeyDown = (evt: React.KeyboardEvent) => {
     if (evt.key === 'Enter') {
       onSubmitLabel();
     } else if (evt.key === 'Escape') {
       setIsEditing(false);
       setLabel(data.label);
+    }
+  };
+
+  const handleDbKeyDown = (evt: React.KeyboardEvent) => {
+    if (evt.key === 'Enter') {
+      onSubmitDbLabel();
+    } else if (evt.key === 'Escape') {
+      setEditingDbId(null);
     }
   };
 
@@ -87,6 +113,19 @@ const CustomNode = ({ data, selected, id }: NodeProps<CustomNodeData>) => {
     e.stopPropagation();
     setIsEditing(true);
   };
+  
+  const startEditingDb = (e: React.MouseEvent, id: string, currentLabel: string) => {
+    e.stopPropagation();
+    setDbLabel(currentLabel);
+    setEditingDbId(id);
+  };
+
+  const handleDeleteDb = (e: React.MouseEvent, dbId: string) => {
+    e.stopPropagation();
+    if (data.onDeleteDatabase) {
+        data.onDeleteDatabase(dbId);
+    }
+  }
 
   // Logic for what buttons to show in the toolbar
   const canAddQueue = data.type === NodeType.SERVICE;
@@ -96,6 +135,8 @@ const CustomNode = ({ data, selected, id }: NodeProps<CustomNodeData>) => {
   
   // Queues cannot be renamed
   const isRenamable = data.type !== NodeType.QUEUE;
+
+  const databases = data.databases || [];
 
   return (
     <>
@@ -116,12 +157,12 @@ const CustomNode = ({ data, selected, id }: NodeProps<CustomNodeData>) => {
 
           {canAddDB && (
             <button 
-              onClick={toggleDB}
-              className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${data.hasDatabase ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-400'}`}
-              title={data.hasDatabase ? "Remover Oracle DB" : "Adicionar Oracle DB Interno"}
+              onClick={(e) => handleAdd(e, NodeType.DATABASE, 'bottom')}
+              className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-400 transition-colors"
+              title="Adicionar Banco(s) de Dados"
             >
               <Database className="w-3 h-3" />
-              <span>{data.hasDatabase ? '- DB' : '+ DB'}</span>
+              <span>+ DB</span>
             </button>
           )}
           
@@ -179,17 +220,25 @@ const CustomNode = ({ data, selected, id }: NodeProps<CustomNodeData>) => {
       )}
 
       <div className={getStyles()} onDoubleClick={() => isRenamable && setIsEditing(true)}>
-        <Handle type="target" position={Position.Left} className="w-3 h-3 bg-slate-400 dark:bg-slate-500" />
-        <Handle type="source" position={Position.Right} className="w-3 h-3 bg-slate-400 dark:bg-slate-500" />
         
-        <Handle type="target" position={Position.Top} id="top" className="w-2 h-2 !bg-transparent" />
-        <Handle type="source" position={Position.Bottom} id="bottom" className="w-2 h-2 !bg-transparent" />
+        {/* Handles on all 4 sides with specific IDs to allows distinct routing */}
+        <Handle type="target" position={Position.Left} id="t-left" className="w-2.5 h-2.5 bg-slate-400 dark:bg-slate-500" />
+        <Handle type="source" position={Position.Left} id="s-left" className="w-2 h-2 !bg-transparent top-[30%]" />
+
+        <Handle type="source" position={Position.Right} id="s-right" className="w-2.5 h-2.5 bg-slate-400 dark:bg-slate-500" />
+        <Handle type="target" position={Position.Right} id="t-right" className="w-2 h-2 !bg-transparent top-[70%]" />
+        
+        <Handle type="target" position={Position.Top} id="t-top" className="w-2 h-2 !bg-transparent left-[30%]" />
+        <Handle type="source" position={Position.Top} id="s-top" className="w-2 h-2 !bg-transparent left-[70%]" />
+        
+        <Handle type="source" position={Position.Bottom} id="s-bottom" className="w-2 h-2 !bg-transparent left-[30%]" />
+        <Handle type="target" position={Position.Bottom} id="t-bottom" className="w-2 h-2 !bg-transparent left-[70%]" />
 
         <div className="p-1.5 bg-slate-100 dark:bg-slate-900 rounded-full">
           {getIcon()}
         </div>
         
-        <div className="text-center w-full z-10">
+        <div className="text-center w-full z-10 mb-1">
           {isEditing && isRenamable ? (
             <input
               ref={inputRef}
@@ -197,7 +246,7 @@ const CustomNode = ({ data, selected, id }: NodeProps<CustomNodeData>) => {
               onChange={(e) => setLabel(e.target.value)}
               onBlur={onSubmitLabel}
               onKeyDown={handleKeyDown}
-              className="w-full text-center text-xs font-bold bg-white dark:bg-slate-700 border border-blue-400 rounded px-1 py-0.5 outline-none text-slate-900 dark:text-slate-100"
+              className="w-full text-center text-xs font-bold bg-white dark:bg-slate-700 border border-blue-400 rounded px-1 py-0.5 outline-none text-slate-900 dark:text-slate-100 nodrag"
             />
           ) : (
             <h3 
@@ -212,13 +261,42 @@ const CustomNode = ({ data, selected, id }: NodeProps<CustomNodeData>) => {
           </p>
         </div>
 
-        {/* Internal Database Visual Indicator */}
-        {data.hasDatabase && (
-          <div className="mt-2 w-full pt-1 border-t border-slate-200 dark:border-slate-700 flex flex-col items-center animate-in fade-in slide-in-from-top-1 duration-300">
-            <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-md w-full justify-center">
-              <Database className="w-2.5 h-2.5 shrink-0" />
-              <span className="text-[9px] font-bold">Oracle DB</span>
-            </div>
+        {/* Internal Databases List */}
+        {databases.length > 0 && (
+          <div className="w-full pt-1 border-t border-slate-200 dark:border-slate-700 flex flex-col items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-300">
+             {databases.map((db) => (
+                 <div key={db.id} className="relative group w-full">
+                     {editingDbId === db.id ? (
+                        <input
+                            ref={dbInputRef}
+                            value={dbLabel}
+                            onChange={(e) => setDbLabel(e.target.value)}
+                            onBlur={onSubmitDbLabel}
+                            onKeyDown={handleDbKeyDown}
+                             className="w-full text-center text-[9px] font-bold bg-white dark:bg-slate-700 border border-amber-400 rounded px-1 py-0.5 outline-none text-slate-900 dark:text-slate-100 nodrag"
+                        />
+                     ) : (
+                        <div 
+                            onDoubleClick={(e) => startEditingDb(e, db.id, db.label)}
+                            className="flex items-center gap-1.5 text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-md w-full justify-center hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors cursor-pointer"
+                            title="Duplo clique para renomear"
+                        >
+                            <Database className="w-2.5 h-2.5 shrink-0" />
+                            <span className="text-[9px] font-bold truncate max-w-[100px]">{db.label}</span>
+                        </div>
+                     )}
+                     
+                     {!editingDbId && (
+                         <button 
+                            onClick={(e) => handleDeleteDb(e, db.id)}
+                            className="absolute -right-1 -top-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:scale-110"
+                            title="Remover Banco"
+                         >
+                             <X className="w-2 h-2" />
+                         </button>
+                     )}
+                 </div>
+             ))}
           </div>
         )}
       </div>

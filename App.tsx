@@ -16,7 +16,7 @@ import ReactFlow, {
   SelectionMode,
   Panel,
 } from 'reactflow';
-import { Layers, Trash2, Mail, Box, Hand, MousePointer2, Download, PenLine, Sparkles } from 'lucide-react';
+import { Layers, Trash2, Mail, Box, Hand, MousePointer2, Download, PenLine, Sparkles, RefreshCw, LayoutTemplate } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
 import CustomNode from './components/CustomNode';
@@ -26,8 +26,9 @@ import ConfirmationModal from './components/ConfirmationModal';
 import NameModal from './components/NameModal';
 import TextToDiagramModal from './components/TextToDiagramModal';
 import { initialNodes, initialEdges, defaultEdgeOptions } from './constants';
-import { CustomNodeData, NodeType } from './types';
+import { CustomNodeData, NodeType, InternalDatabase } from './types';
 import { generateDiagramFromText } from './services/geminiService';
+import { getLayoutedElements } from './services/layoutService';
 
 // Define custom node types
 const nodeTypes: NodeTypes = {
@@ -41,6 +42,41 @@ const edgeTypes: EdgeTypes = {
 
 // Simple ID generator
 const generateId = () => `node_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+const generateDbId = () => `db_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+
+// Helper to get smart handles to separate queues from rest services
+const getSmartHandleConfig = (layoutDir: string, targetType: NodeType) => {
+  // Logic: 
+  // - REST services continue on the main axis.
+  // - Queues branch off on the cross axis (90 degrees).
+
+  const isQueue = targetType === NodeType.QUEUE;
+
+  switch (layoutDir) {
+    case 'LR': // Horizontal (Left -> Right)
+      return {
+        sourceHandle: isQueue ? 's-bottom' : 's-right',
+        targetHandle: isQueue ? 't-top' : 't-left',
+      };
+    case 'TB': // Vertical (Top -> Bottom)
+      return {
+        sourceHandle: isQueue ? 's-right' : 's-bottom',
+        targetHandle: isQueue ? 't-left' : 't-top',
+      };
+    case 'RL': // Horizontal Reverse (Right -> Left)
+      return {
+        sourceHandle: isQueue ? 's-top' : 's-left',
+        targetHandle: isQueue ? 't-bottom' : 't-right',
+      };
+    case 'BT': // Vertical Reverse (Bottom -> Top)
+      return {
+        sourceHandle: isQueue ? 's-left' : 's-top',
+        targetHandle: isQueue ? 't-right' : 't-bottom',
+      };
+    default:
+      return { sourceHandle: null, targetHandle: null };
+  }
+};
 
 // Helper to determine edge style based on SOURCE and TARGET types
 const getEdgeParams = (sourceType: NodeType, targetType: NodeType) => {
@@ -98,6 +134,9 @@ function AppContent() {
   // Diagram Title State
   const [diagramTitle, setDiagramTitle] = useState('Sem Título');
   
+  // Layout Direction State ('LR' = Left-Right, 'TB' = Top-Bottom, etc.)
+  const [currentLayoutDir, setCurrentLayoutDir] = useState('LR');
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
@@ -110,7 +149,7 @@ function AppContent() {
     direction: 'right' | 'bottom';
   } | null>(null);
 
-  const { getNode } = useReactFlow();
+  const { getNode, fitView } = useReactFlow();
 
   // Ref to store the latest version of the addNode function
   const requestConnectionRef = useRef<(sourceId: string, targetType: NodeType, direction: 'right' | 'bottom') => void>(() => {});
@@ -126,8 +165,17 @@ function AppContent() {
       
       const edgeParams = getEdgeParams(sourceType, targetType);
 
+      // Auto-assign smart handle if dragging generically (handle is null or default)
+      // OR force it if we want to enforce the layout rules even on manual connect
+      let finalParams = { ...params };
+      if (!params.sourceHandle || !params.targetHandle) {
+         const smartHandles = getSmartHandleConfig(currentLayoutDir, targetType);
+         finalParams.sourceHandle = smartHandles.sourceHandle || params.sourceHandle;
+         finalParams.targetHandle = smartHandles.targetHandle || params.targetHandle;
+      }
+
       const newEdge = {
-        ...params,
+        ...finalParams,
         type: 'custom', // Use our custom edge
         markerEnd: { type: MarkerType.ArrowClosed, color: edgeParams.style.stroke },
         ...edgeParams,
@@ -135,8 +183,57 @@ function AppContent() {
 
       setEdges((eds) => addEdge(newEdge, eds));
     },
-    [setEdges, getNode],
+    [setEdges, getNode, currentLayoutDir],
   );
+
+  // Auto Layout Handler - Cycles through directions and fixes handles
+  const onLayout = useCallback(() => {
+    // Cycle: LR -> TB -> RL -> BT -> LR
+    const directions = ['LR', 'TB', 'RL', 'BT'];
+    const currentIndex = directions.indexOf(currentLayoutDir);
+    const nextDirection = directions[(currentIndex + 1) % directions.length];
+    
+    // Friendly name for Toast/Console (optional)
+    const dirNames: Record<string, string> = { 
+        'LR': 'Horizontal', 
+        'TB': 'Vertical', 
+        'RL': 'Horizontal Inverso', 
+        'BT': 'Vertical Inverso' 
+    };
+    console.log(`Alterando layout para: ${dirNames[nextDirection]}`);
+
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+      nodes,
+      edges,
+      nextDirection
+    );
+
+    // FIX HANDLES based on new direction
+    // Iterate over edges and update source/target handles to ensure distinct lines for queues vs rest
+    const fixedEdges = layoutedEdges.map(edge => {
+        const targetNode = layoutedNodes.find(n => n.id === edge.target);
+        if (targetNode) {
+            const smartHandles = getSmartHandleConfig(nextDirection, targetNode.data.type as NodeType);
+            return {
+                ...edge,
+                sourceHandle: smartHandles.sourceHandle,
+                targetHandle: smartHandles.targetHandle
+            };
+        }
+        return edge;
+    });
+
+    setNodes([...layoutedNodes]);
+    setEdges([...fixedEdges]);
+    setCurrentLayoutDir(nextDirection);
+
+    // Animate fit view after layout update with extra padding for legend
+    setTimeout(() => {
+        window.requestAnimationFrame(() => {
+            fitView({ padding: 0.3, duration: 800 });
+        });
+    }, 10);
+  }, [nodes, edges, currentLayoutDir, setNodes, setEdges, fitView]);
 
   // Updates node label
   const onLabelChange = useCallback((id: string, newLabel: string) => {
@@ -153,15 +250,68 @@ function AppContent() {
     );
   }, [setNodes]);
 
-  // Toggles internal database state
+  // Rename Internal Database
+  const onRenameDatabase = useCallback((nodeId: string, dbId: string, newLabel: string) => {
+    setNodes((nds) => 
+      nds.map((node) => {
+        if (node.id === nodeId && node.data.databases) {
+          const newDbs = node.data.databases.map(db => 
+            db.id === dbId ? { ...db, label: newLabel } : db
+          );
+          return {
+            ...node,
+            data: { ...node.data, databases: newDbs }
+          };
+        }
+        return node;
+      })
+    );
+  }, [setNodes]);
+
+  // Delete Internal Database
+  const onDeleteDatabase = useCallback((nodeId: string, dbId: string) => {
+    setNodes((nds) => 
+      nds.map((node) => {
+        if (node.id === nodeId && node.data.databases) {
+          const newDbs = node.data.databases.filter(db => db.id !== dbId);
+          return {
+            ...node,
+            data: { 
+              ...node.data, 
+              databases: newDbs,
+              hasDatabase: newDbs.length > 0 // Legacy compatibility
+            }
+          };
+        }
+        return node;
+      })
+    );
+  }, [setNodes]);
+
+  // Toggles internal database state (Adding 1 default DB)
   const onToggleDatabase = useCallback((id: string) => {
     setNodes((nds) => 
       nds.map((node) => {
         if (node.id === id) {
-          return {
-            ...node,
-            data: { ...node.data, hasDatabase: !node.data.hasDatabase }
-          };
+          // If it has DBs, remove all? Or just add one? 
+          // Default behavior: Add one if empty, otherwise do nothing (to avoid accidental deletion)
+          // Or toggle: If has DBs, remove all. If empty, add one.
+          const currentDbs = node.data.databases || [];
+          if (currentDbs.length > 0) {
+             return {
+              ...node,
+              data: { ...node.data, databases: [], hasDatabase: false }
+             }
+          } else {
+             return {
+              ...node,
+              data: { 
+                ...node.data, 
+                databases: [{ id: generateDbId(), label: 'Oracle DB' }], 
+                hasDatabase: true 
+              }
+             }
+          }
         }
         return node;
       })
@@ -215,6 +365,7 @@ function AppContent() {
 
         let label = 'Novo Serviço';
         if (targetType === NodeType.QUEUE) label = 'IBM MQ';
+        if (targetType === NodeType.DATABASE) label = 'Oracle DB';
 
         const newNode: Node<CustomNodeData> = {
           id: newId,
@@ -223,31 +374,28 @@ function AppContent() {
           data: { 
             label, 
             type: targetType,
+            databases: [], // Init empty
             // Use the Ref to avoid stale closures
             onAddConnection: (t, d) => requestConnectionRef.current(newId, t, d),
             onLabelChange: (l) => onLabelChange(newId, l),
             onDelete: () => onDeleteNode(newId),
             onToggleDatabase: () => onToggleDatabase(newId),
+            onRenameDatabase: (dbId, val) => onRenameDatabase(newId, dbId, val),
+            onDeleteDatabase: (dbId) => onDeleteDatabase(newId, dbId),
           },
         };
 
         const edgeParams = getEdgeParams(sourceType, targetType);
 
-        // Logic to determine handle connection points based on layout direction
-        let sourceHandle: string | null = null;
-        let targetHandle: string | null = null;
-
-        if (direction === 'bottom') {
-            sourceHandle = 'bottom'; // Connects from the bottom of parent
-            targetHandle = 'top';    // To the top of the child
-        }
+        // Logic to determine handle connection points based on layout direction AND target type
+        const smartHandles = getSmartHandleConfig(currentLayoutDir, targetType);
 
         const newEdge = {
           id: `e_${sourceId}-${newId}`,
           source: sourceId,
           target: newId,
-          sourceHandle,
-          targetHandle,
+          sourceHandle: smartHandles.sourceHandle,
+          targetHandle: smartHandles.targetHandle,
           type: 'custom', 
           markerEnd: { type: MarkerType.ArrowClosed, color: edgeParams.style.stroke },
           ...edgeParams
@@ -259,13 +407,13 @@ function AppContent() {
 
     setNodes((nds) => nds.concat(newNodes));
     setEdges((eds) => eds.concat(newEdges));
-  }, [getNode, nodes, setNodes, setEdges, onLabelChange, onDeleteNode, onToggleDatabase]);
+  }, [getNode, nodes, setNodes, setEdges, onLabelChange, onDeleteNode, onToggleDatabase, onRenameDatabase, onDeleteDatabase, currentLayoutDir]);
 
 
   // ENTRY POINT FROM NODE COMPONENT
   // This function decides if we need to open a modal or just proceed
   const handleRequestConnection = useCallback((sourceId: string, targetType: NodeType, direction: 'right' | 'bottom') => {
-    if (targetType === NodeType.SERVICE) {
+    if (targetType === NodeType.SERVICE || targetType === NodeType.DATABASE) {
       // Open modal to ask for quantity
       setPendingConnection({ sourceId, targetType, direction });
       setIsModalOpen(true);
@@ -285,12 +433,39 @@ function AppContent() {
   // Modal Confirmation Handler
   const handleModalConfirm = (count: number) => {
     if (pendingConnection) {
-      createNodesAndEdges(
-        pendingConnection.sourceId, 
-        pendingConnection.targetType, 
-        pendingConnection.direction, 
-        count
-      );
+      // Check if we are adding databases to a service (Internal representation)
+      if (pendingConnection.targetType === NodeType.DATABASE) {
+        setNodes((nds) => nds.map((node) => {
+          if (node.id === pendingConnection.sourceId) {
+            // Generate N new internal databases
+            const newDbs: InternalDatabase[] = Array.from({ length: count }).map((_, i) => ({
+                id: generateDbId(),
+                label: `Oracle DB ${i + 1}`
+            }));
+            
+            // Append to existing or create new
+            const existingDbs = node.data.databases || [];
+
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                hasDatabase: true, // Legacy flag
+                databases: [...existingDbs, ...newDbs]
+              }
+            };
+          }
+          return node;
+        }));
+      } else {
+        // For Services and other external nodes, create actual nodes/edges
+        createNodesAndEdges(
+          pendingConnection.sourceId, 
+          pendingConnection.targetType, 
+          pendingConnection.direction, 
+          count
+        );
+      }
     }
     setIsModalOpen(false);
     setPendingConnection(null);
@@ -301,17 +476,36 @@ function AppContent() {
     const { nodes: newNodes, edges: newEdges } = await generateDiagramFromText(description);
     
     // Inject methods into generated nodes so they work with the UI
-    const interactiveNodes = newNodes.map(n => ({
-      ...n,
-      type: 'custom', // Ensure it uses our custom node component
-      data: {
-        ...n.data,
-        onAddConnection: (t: NodeType, d: 'right' | 'bottom') => requestConnectionRef.current(n.id, t, d),
-        onLabelChange: (l: string) => onLabelChange(n.id, l),
-        onDelete: () => onDeleteNode(n.id),
-        onToggleDatabase: () => onToggleDatabase(n.id),
+    const interactiveNodes = newNodes.map(n => {
+      // Determine databases logic: Priority to explicit AI list, fallback to boolean flag
+      let databases: InternalDatabase[] = [];
+
+      if (n.data.databases && Array.isArray(n.data.databases) && n.data.databases.length > 0) {
+        // Hydrate IDs if missing from AI
+        databases = n.data.databases.map((db: any) => ({
+             id: db.id || generateDbId(),
+             label: db.label || 'Oracle DB'
+        }));
+      } else if (n.data.hasDatabase) {
+        // Fallback for legacy format or AI missing the array instruction
+        databases = [{ id: generateDbId(), label: 'Oracle DB' }];
       }
-    }));
+
+      return {
+        ...n,
+        type: 'custom', // Ensure it uses our custom node component
+        data: {
+            ...n.data,
+            databases: databases,
+            onAddConnection: (t: NodeType, d: 'right' | 'bottom') => requestConnectionRef.current(n.id, t, d),
+            onLabelChange: (l: string) => onLabelChange(n.id, l),
+            onDelete: () => onDeleteNode(n.id),
+            onToggleDatabase: () => onToggleDatabase(n.id),
+            onRenameDatabase: (dbId: string, val: string) => onRenameDatabase(n.id, dbId, val),
+            onDeleteDatabase: (dbId: string) => onDeleteDatabase(n.id, dbId),
+        }
+      };
+    });
 
     // Inject styles into generated edges
     const interactiveEdges = newEdges.map(e => {
@@ -332,6 +526,31 @@ function AppContent() {
 
     setNodes(interactiveNodes);
     setEdges(interactiveEdges);
+    
+    // Auto layout after generation (Reset to LR)
+    // IMPORTANT: Run layout logic to fix handles immediately after generation
+    setTimeout(() => {
+        const layouted = getLayoutedElements(interactiveNodes, interactiveEdges, 'LR');
+        
+        // Apply smart handles to AI generated edges
+        const fixedEdges = layouted.edges.map(edge => {
+            const targetNode = layouted.nodes.find(n => n.id === edge.target);
+             if (targetNode) {
+                const smartHandles = getSmartHandleConfig('LR', targetNode.data.type as NodeType);
+                return {
+                    ...edge,
+                    sourceHandle: smartHandles.sourceHandle,
+                    targetHandle: smartHandles.targetHandle
+                };
+            }
+            return edge;
+        });
+
+        setNodes([...layouted.nodes]);
+        setEdges([...fixedEdges]);
+        setCurrentLayoutDir('LR');
+        window.requestAnimationFrame(() => fitView({ padding: 0.3, duration: 800 }));
+    }, 100);
   };
 
 
@@ -350,10 +569,13 @@ function AppContent() {
       data: { 
         label: 'Microserviço', 
         type: NodeType.SERVICE,
+        databases: [],
         onAddConnection: (t, d) => requestConnectionRef.current(id, t, d),
         onLabelChange: (l) => onLabelChange(id, l),
         onDelete: () => onDeleteNode(id),
         onToggleDatabase: () => onToggleDatabase(id),
+        onRenameDatabase: (dbId, val) => onRenameDatabase(id, dbId, val),
+        onDeleteDatabase: (dbId) => onDeleteDatabase(id, dbId),
       },
     };
 
@@ -375,6 +597,7 @@ function AppContent() {
       data: { 
         label: 'IBM MQ', 
         type: NodeType.QUEUE,
+        databases: [],
         onAddConnection: (t, d) => requestConnectionRef.current(id, t, d),
         onLabelChange: (l) => onLabelChange(id, l),
         onDelete: () => onDeleteNode(id),
@@ -417,6 +640,11 @@ function AppContent() {
     });
   };
 
+  const getModalTitle = () => {
+    if (pendingConnection?.targetType === NodeType.DATABASE) return "Adicionar Bancos de Dados";
+    return "Adicionar Microserviços";
+  };
+
   return (
     <div className="w-full h-screen flex flex-col">
       {/* Header */}
@@ -454,6 +682,17 @@ function AppContent() {
             <Sparkles className="w-4 h-4" />
             <span className="hidden md:inline font-medium">IA Geradora</span>
           </button>
+          
+           {nodes.length > 0 && (
+             <button
+               onClick={onLayout}
+               className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg transition-colors mr-2 border border-slate-200 dark:border-slate-700 group"
+               title="Alterar Layout (Ciclo: Horizontal -> Vertical)"
+             >
+               <LayoutTemplate className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
+               <span className="hidden lg:inline text-sm font-medium">Layout</span>
+             </button>
+           )}
 
           <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-1"></div>
 
@@ -523,6 +762,7 @@ function AppContent() {
           edgeTypes={edgeTypes}
           defaultEdgeOptions={{ ...defaultEdgeOptions, type: 'custom' }}
           fitView
+          fitViewOptions={{ padding: 0.3 }}
           attributionPosition="bottom-left"
           className="dark:bg-slate-950"
           deleteKeyCode={['Backspace', 'Delete']}
@@ -568,7 +808,7 @@ function AppContent() {
         </ReactFlow>
         
         {/* Floating Legend */}
-        <div className="absolute bottom-6 left-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur p-4 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 text-xs space-y-2 pointer-events-none z-10 hidden sm:block">
+        <div className="absolute bottom-6 right-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur p-4 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 text-xs space-y-2 pointer-events-none z-10 hidden sm:block">
           <div className="font-bold text-slate-500 mb-2 uppercase tracking-wider">Conexões</div>
           <div className="flex items-center gap-2"><div className="w-8 h-0.5 bg-blue-500"></div><span className="text-slate-700 dark:text-slate-300">REST (Azul)</span></div>
           <div className="flex items-center gap-2"><div className="w-8 h-0.5 bg-amber-500"></div><span className="text-slate-700 dark:text-slate-300">SQL (Laranja)</span></div>
@@ -586,6 +826,7 @@ function AppContent() {
             setPendingConnection(null);
         }}
         onConfirm={handleModalConfirm}
+        title={getModalTitle()}
       />
       
       <NameModal 

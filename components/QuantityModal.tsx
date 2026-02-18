@@ -5,9 +5,10 @@ interface QuantityModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (count: number) => void;
+  title?: string; // New prop for dynamic title
 }
 
-const QuantityModal: React.FC<QuantityModalProps> = ({ isOpen, onClose, onConfirm }) => {
+const QuantityModal: React.FC<QuantityModalProps> = ({ isOpen, onClose, onConfirm, title = "Adicionar Microserviços" }) => {
   const [count, setCount] = useState<number>(1);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -38,7 +39,7 @@ const QuantityModal: React.FC<QuantityModalProps> = ({ isOpen, onClose, onConfir
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
             <Layers className="w-5 h-5" />
-            <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">Adicionar Microserviços</h3>
+            <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">{title}</h3>
           </div>
           <button 
             onClick={onClose}
@@ -51,7 +52,7 @@ const QuantityModal: React.FC<QuantityModalProps> = ({ isOpen, onClose, onConfir
         <form onSubmit={handleSubmit}>
           <div className="mb-6">
             <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
-              Quantidade de serviços a criar
+              Quantidade a criar
             </label>
             <input
               ref={inputRef}
