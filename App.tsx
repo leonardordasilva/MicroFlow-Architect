@@ -16,7 +16,7 @@ import ReactFlow, {
   SelectionMode,
   Panel,
 } from 'reactflow';
-import { Layers, Trash2, Mail, Box, Hand, MousePointer2, Download, PenLine, Sparkles, RefreshCw, LayoutTemplate } from 'lucide-react';
+import { Layers, Trash2, Mail, Box, Hand, MousePointer2, Download, PenLine, Sparkles, LayoutTemplate } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
 import CustomNode from './components/CustomNode';
@@ -166,7 +166,6 @@ function AppContent() {
       const edgeParams = getEdgeParams(sourceType, targetType);
 
       // Auto-assign smart handle if dragging generically (handle is null or default)
-      // OR force it if we want to enforce the layout rules even on manual connect
       let finalParams = { ...params };
       if (!params.sourceHandle || !params.targetHandle) {
          const smartHandles = getSmartHandleConfig(currentLayoutDir, targetType);
@@ -209,7 +208,6 @@ function AppContent() {
     );
 
     // FIX HANDLES based on new direction
-    // Iterate over edges and update source/target handles to ensure distinct lines for queues vs rest
     const fixedEdges = layoutedEdges.map(edge => {
         const targetNode = layoutedNodes.find(n => n.id === edge.target);
         if (targetNode) {
@@ -227,7 +225,6 @@ function AppContent() {
     setEdges([...fixedEdges]);
     setCurrentLayoutDir(nextDirection);
 
-    // Animate fit view after layout update with extra padding for legend
     setTimeout(() => {
         window.requestAnimationFrame(() => {
             fitView({ padding: 0.3, duration: 800 });
@@ -279,7 +276,7 @@ function AppContent() {
             data: { 
               ...node.data, 
               databases: newDbs,
-              hasDatabase: newDbs.length > 0 // Legacy compatibility
+              hasDatabase: newDbs.length > 0 
             }
           };
         }
@@ -293,9 +290,6 @@ function AppContent() {
     setNodes((nds) => 
       nds.map((node) => {
         if (node.id === id) {
-          // If it has DBs, remove all? Or just add one? 
-          // Default behavior: Add one if empty, otherwise do nothing (to avoid accidental deletion)
-          // Or toggle: If has DBs, remove all. If empty, add one.
           const currentDbs = node.data.databases || [];
           if (currentDbs.length > 0) {
              return {
@@ -348,14 +342,13 @@ function AppContent() {
 
         if (direction === 'bottom') {
           // Horizontal Distribution below parent
-          // Center the group relative to parent
           const xOffset = (i - (count - 1) / 2) * horizontalGap;
           position = {
             x: sourceNode.position.x + xOffset,
             y: sourceNode.position.y + verticalGap
           };
         } else {
-          // Vertical Distribution to the right of parent (default for Queues etc)
+          // Vertical Distribution to the right of parent
           const yOffset = (i - (count - 1) / 2) * verticalGap;
           position = {
             x: sourceNode.position.x + horizontalGap,
@@ -375,7 +368,6 @@ function AppContent() {
             label, 
             type: targetType,
             databases: [], // Init empty
-            // Use the Ref to avoid stale closures
             onAddConnection: (t, d) => requestConnectionRef.current(newId, t, d),
             onLabelChange: (l) => onLabelChange(newId, l),
             onDelete: () => onDeleteNode(newId),
@@ -386,8 +378,6 @@ function AppContent() {
         };
 
         const edgeParams = getEdgeParams(sourceType, targetType);
-
-        // Logic to determine handle connection points based on layout direction AND target type
         const smartHandles = getSmartHandleConfig(currentLayoutDir, targetType);
 
         const newEdge = {
@@ -411,14 +401,11 @@ function AppContent() {
 
 
   // ENTRY POINT FROM NODE COMPONENT
-  // This function decides if we need to open a modal or just proceed
   const handleRequestConnection = useCallback((sourceId: string, targetType: NodeType, direction: 'right' | 'bottom') => {
     if (targetType === NodeType.SERVICE || targetType === NodeType.DATABASE) {
-      // Open modal to ask for quantity
       setPendingConnection({ sourceId, targetType, direction });
       setIsModalOpen(true);
     } else {
-      // Just add one (e.g. Queue)
       createNodesAndEdges(sourceId, targetType, direction, 1);
     }
   }, [createNodesAndEdges]);
@@ -433,17 +420,14 @@ function AppContent() {
   // Modal Confirmation Handler
   const handleModalConfirm = (count: number) => {
     if (pendingConnection) {
-      // Check if we are adding databases to a service (Internal representation)
       if (pendingConnection.targetType === NodeType.DATABASE) {
         setNodes((nds) => nds.map((node) => {
           if (node.id === pendingConnection.sourceId) {
-            // Generate N new internal databases
             const newDbs: InternalDatabase[] = Array.from({ length: count }).map((_, i) => ({
                 id: generateDbId(),
                 label: `Oracle DB ${i + 1}`
             }));
             
-            // Append to existing or create new
             const existingDbs = node.data.databases || [];
 
             return {
@@ -458,7 +442,6 @@ function AppContent() {
           return node;
         }));
       } else {
-        // For Services and other external nodes, create actual nodes/edges
         createNodesAndEdges(
           pendingConnection.sourceId, 
           pendingConnection.targetType, 
@@ -471,90 +454,93 @@ function AppContent() {
     setPendingConnection(null);
   };
 
-  // Generate Diagram Handler
+  // Process generated nodes to add interactivity methods
+  const processGeneratedElements = (newNodes: Node<CustomNodeData>[], newEdges: Edge[]) => {
+      const interactiveNodes = newNodes.map(n => {
+        let databases: InternalDatabase[] = [];
+
+        if (n.data.databases && Array.isArray(n.data.databases) && n.data.databases.length > 0) {
+          databases = n.data.databases.map((db: any) => ({
+              id: db.id || generateDbId(),
+              label: db.label || 'Oracle DB'
+          }));
+        } else if (n.data.hasDatabase) {
+          databases = [{ id: generateDbId(), label: 'Oracle DB' }];
+        }
+
+        return {
+          ...n,
+          type: 'custom', 
+          data: {
+              ...n.data,
+              databases: databases,
+              onAddConnection: (t: NodeType, d: 'right' | 'bottom') => requestConnectionRef.current(n.id, t, d),
+              onLabelChange: (l: string) => onLabelChange(n.id, l),
+              onDelete: () => onDeleteNode(n.id),
+              onToggleDatabase: () => onToggleDatabase(n.id),
+              onRenameDatabase: (dbId: string, val: string) => onRenameDatabase(n.id, dbId, val),
+              onDeleteDatabase: (dbId: string) => onDeleteDatabase(n.id, dbId),
+          }
+        };
+      });
+
+      const interactiveEdges = newEdges.map(e => {
+        const sourceNode = interactiveNodes.find(n => n.id === e.source);
+        const targetNode = interactiveNodes.find(n => n.id === e.target);
+        const params = getEdgeParams(
+          (sourceNode?.data.type as NodeType) || NodeType.SERVICE, 
+          (targetNode?.data.type as NodeType) || NodeType.SERVICE
+        );
+
+        return {
+          ...e,
+          type: 'custom',
+          markerEnd: { type: MarkerType.ArrowClosed, color: params.style.stroke },
+          ...params
+        };
+      });
+
+      return { interactiveNodes, interactiveEdges };
+  };
+
+  // Generate Diagram Handler (Text)
   const handleGenerateDiagram = async (description: string) => {
     const { nodes: newNodes, edges: newEdges } = await generateDiagramFromText(description);
-    
-    // Inject methods into generated nodes so they work with the UI
-    const interactiveNodes = newNodes.map(n => {
-      // Determine databases logic: Priority to explicit AI list, fallback to boolean flag
-      let databases: InternalDatabase[] = [];
-
-      if (n.data.databases && Array.isArray(n.data.databases) && n.data.databases.length > 0) {
-        // Hydrate IDs if missing from AI
-        databases = n.data.databases.map((db: any) => ({
-             id: db.id || generateDbId(),
-             label: db.label || 'Oracle DB'
-        }));
-      } else if (n.data.hasDatabase) {
-        // Fallback for legacy format or AI missing the array instruction
-        databases = [{ id: generateDbId(), label: 'Oracle DB' }];
-      }
-
-      return {
-        ...n,
-        type: 'custom', // Ensure it uses our custom node component
-        data: {
-            ...n.data,
-            databases: databases,
-            onAddConnection: (t: NodeType, d: 'right' | 'bottom') => requestConnectionRef.current(n.id, t, d),
-            onLabelChange: (l: string) => onLabelChange(n.id, l),
-            onDelete: () => onDeleteNode(n.id),
-            onToggleDatabase: () => onToggleDatabase(n.id),
-            onRenameDatabase: (dbId: string, val: string) => onRenameDatabase(n.id, dbId, val),
-            onDeleteDatabase: (dbId: string) => onDeleteDatabase(n.id, dbId),
-        }
-      };
-    });
-
-    // Inject styles into generated edges
-    const interactiveEdges = newEdges.map(e => {
-       const sourceNode = interactiveNodes.find(n => n.id === e.source);
-       const targetNode = interactiveNodes.find(n => n.id === e.target);
-       const params = getEdgeParams(
-         (sourceNode?.data.type as NodeType) || NodeType.SERVICE, 
-         (targetNode?.data.type as NodeType) || NodeType.SERVICE
-       );
-
-       return {
-         ...e,
-         type: 'custom',
-         markerEnd: { type: MarkerType.ArrowClosed, color: params.style.stroke },
-         ...params
-       };
-    });
+    const { interactiveNodes, interactiveEdges } = processGeneratedElements(newNodes, newEdges);
 
     setNodes(interactiveNodes);
     setEdges(interactiveEdges);
     
     // Auto layout after generation (Reset to LR)
-    // IMPORTANT: Run layout logic to fix handles immediately after generation
-    setTimeout(() => {
-        const layouted = getLayoutedElements(interactiveNodes, interactiveEdges, 'LR');
-        
-        // Apply smart handles to AI generated edges
-        const fixedEdges = layouted.edges.map(edge => {
-            const targetNode = layouted.nodes.find(n => n.id === edge.target);
-             if (targetNode) {
-                const smartHandles = getSmartHandleConfig('LR', targetNode.data.type as NodeType);
-                return {
-                    ...edge,
-                    sourceHandle: smartHandles.sourceHandle,
-                    targetHandle: smartHandles.targetHandle
-                };
-            }
-            return edge;
-        });
+    applyAutoLayout(interactiveNodes, interactiveEdges);
+  };
 
-        setNodes([...layouted.nodes]);
-        setEdges([...fixedEdges]);
-        setCurrentLayoutDir('LR');
-        window.requestAnimationFrame(() => fitView({ padding: 0.3, duration: 800 }));
-    }, 100);
+  // Helper to apply layout after generation
+  const applyAutoLayout = (currentNodes: Node[], currentEdges: Edge[]) => {
+      setTimeout(() => {
+          const layouted = getLayoutedElements(currentNodes, currentEdges, 'LR');
+          
+          const fixedEdges = layouted.edges.map(edge => {
+              const targetNode = layouted.nodes.find(n => n.id === edge.target);
+               if (targetNode) {
+                  const smartHandles = getSmartHandleConfig('LR', targetNode.data.type as NodeType);
+                  return {
+                      ...edge,
+                      sourceHandle: smartHandles.sourceHandle,
+                      targetHandle: smartHandles.targetHandle
+                  };
+              }
+              return edge;
+          });
+
+          setNodes([...layouted.nodes]);
+          setEdges([...fixedEdges]);
+          setCurrentLayoutDir('LR');
+          window.requestAnimationFrame(() => fitView({ padding: 0.3, duration: 800 }));
+      }, 100);
   };
 
 
-  // Main function to add a standalone Microservice (Root)
   const addMicroservice = () => {
     const id = generateId();
     const position = { 
@@ -582,7 +568,6 @@ function AppContent() {
     setNodes((nds) => nds.concat(newNode));
   };
 
-  // Main function to add a standalone Queue (Root)
   const addQueue = () => {
     const id = generateId();
     const position = { 
@@ -613,17 +598,14 @@ function AppContent() {
   }, [setNodes, setEdges]);
 
 
-  // Export to Image Logic
   const handleDownloadImage = () => {
     const flowElement = document.querySelector('.react-flow') as HTMLElement;
 
     if (!flowElement) return;
 
-    // Detect if dark mode is active to set background color
     const isDarkMode = document.documentElement.classList.contains('dark');
-    const bgColor = isDarkMode ? '#020617' : '#f8fafc'; // slate-950 or slate-50
+    const bgColor = isDarkMode ? '#020617' : '#f8fafc';
 
-    // Capture the entire flow viewport
     toPng(flowElement, {
       backgroundColor: bgColor,
       style: {
@@ -676,11 +658,11 @@ function AppContent() {
           {/* AI Generator Button */}
           <button
             onClick={() => setIsTextToDiagramOpen(true)}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-colors mr-4 shadow-md shadow-purple-600/20 active:scale-95"
-            title="Gerar Diagrama com IA"
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-colors mr-2 shadow-md shadow-purple-600/20 active:scale-95"
+            title="Gerar Diagrama com IA (Texto)"
           >
             <Sparkles className="w-4 h-4" />
-            <span className="hidden md:inline font-medium">IA Geradora</span>
+            <span className="hidden md:inline font-medium">IA Texto</span>
           </button>
           
            {nodes.length > 0 && (
@@ -783,7 +765,7 @@ function AppContent() {
                 </h1>
              </div>
           </Panel>
-
+          
           {nodes.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
               <div className="text-center p-8 bg-white/50 dark:bg-slate-900/50 backdrop-blur rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 max-w-md">

@@ -3,17 +3,16 @@ import { Node, Edge } from 'reactflow';
 import { CustomNodeData, NodeType } from '../types';
 
 // Lista de modelos para tentar em ordem de prioridade.
-// Atualizado para capturar erros 503 e tentar o próximo modelo.
 const MODELS = [
   'gemini-2.0-flash',
   'gemini-3-flash-preview',
   'gemini-flash-latest', 
-  'gemini-1.5-flash-8b' // Adicionado como fallback ultra-leve
+  'gemini-1.5-flash-8b'
 ];
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const generateWithFallback = async (ai: GoogleGenAI, prompt: string, config: any = {}) => {
+const generateWithFallback = async (ai: GoogleGenAI, prompt: string | any[], config: any = {}) => {
   let lastError: any;
 
   for (const model of MODELS) {
@@ -28,31 +27,22 @@ const generateWithFallback = async (ai: GoogleGenAI, prompt: string, config: any
       lastError = error;
       const errMsg = String(error);
       
-      // Verifica tipos de erro para decisão de fallback
       const isQuotaError = errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('Quota') || errMsg.includes('Too Many Requests');
       const isNotFoundError = errMsg.includes('404') || errMsg.includes('NOT_FOUND') || errMsg.includes('not found');
       const isOverloadedError = errMsg.includes('503') || errMsg.includes('Overloaded') || errMsg.includes('Service Unavailable');
       
-      // Log para debug
       console.warn(`Falha no modelo ${model}.`, { isQuotaError, isNotFoundError, isOverloadedError, msg: errMsg });
 
       if (isQuotaError || isNotFoundError || isOverloadedError) {
-        // Se for erro de cota ou sobrecarga, espera um pouco mais
         if (isQuotaError || isOverloadedError) {
             console.log("Aguardando liberação de recurso...");
             await sleep(1500);
         }
-        
-        // Continua para o próximo modelo da lista
         continue; 
       }
-
-      // Se for outro erro (ex: 400 Bad Request), aborta imediatamente
       throw error;
     }
   }
-
-  // Se todos falharem
   console.error("Todos os modelos de fallback falharam.");
   throw lastError;
 };
@@ -102,82 +92,8 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
   }
 };
 
-export const generateDiagramFromText = async (description: string): Promise<{ nodes: Node<CustomNodeData>[], edges: Edge[] }> => {
-  const apiKey = process.env.API_KEY;
-
-  if (!apiKey) {
-    throw new Error("API Key não encontrada.");
-  }
-
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-
-    const prompt = `
-      Atue como um gerador de diagramas de arquitetura React Flow altamente especializado.
-      Descrição do usuário: "${description}".
-
-      REGRAS CRÍTICAS DE COMPORTAMENTO (Siga estritamente):
-
-      1. REGRA DE BANCO DE DADOS (Internalização e Quantidade):
-         - Se a descrição diz que um serviço "tem um banco", "usa oracle", "salva dados":
-           NÃO crie um nó separado do tipo "database". O banco deve ser interno.
-         - QUANTIDADE: Se o usuário disser "tem 2 bancos", "possui 3 bases de dados", etc:
-           Você deve preencher a propriedade "databases" dentro de "data".
-           Esta propriedade deve ser um ARRAY de objetos.
-           Exemplo para 2 bancos: "databases": [{ "id": "db_1", "label": "DB Vendas" }, { "id": "db_2", "label": "DB Log" }]
-         - Se a quantidade não for especificada, mas disser que tem banco, crie um array com 1 objeto padrão.
-
-      2. REGRA DE ISOLAMENTO VISUAL (Duplicação de Nós REST):
-         - Objetivo: Clareza visual absoluta. O diagrama deve ser lido da esquerda para a direita sem linhas cruzando a tela inteira.
-         - Se "Serviço A" e "Serviço B" chamam o "Serviço C":
-           VOCÊ DEVE CRIAR DUAS CÓPIAS VISUAIS DO "Serviço C".
-           - Cópia 1: ID "svc_c_1", posicionado imediatamente à direita do "Serviço A".
-           - Cópia 2: ID "svc_c_2", posicionado imediatamente à direita do "Serviço B".
-         - NUNCA reutilize o mesmo nó de destino para chamadores distantes. Cada fluxo deve parecer independente.
-
-      3. LAYOUT E POSICIONAMENTO:
-         - Fluxo: Esquerda (x: 0) -> Direita (x: growing).
-         - Proximidade: O serviço chamado deve estar EXATAMENTE à direita do seu chamador (Offset X: +300px).
-         - Alinhamento Vertical: Se um serviço chama 3 outros, empilhe-os verticalmente com espaçamento de 150px no eixo Y, todos alinhados no mesmo eixo X.
-      
-      4. TIPOS DE NÓS:
-         - 'service' (Microserviços, APIs)
-         - 'queue' (Filas, Tópicos, MQ)
-         - 'external' (Sistemas terceiros)
-         - 'database' (APENAS para DBs soltos, não vinculados a um serviço específico)
-
-      5. FORMATO DE SAÍDA:
-         - Retorne APENAS um objeto JSON válido.
-         - NÃO inclua comentários (// ou /* */) dentro do JSON.
-         - NÃO use trailing commas.
-
-      Exemplo de JSON esperado:
-      {
-        "nodes": [
-          { 
-            "id": "unique_id_1", 
-            "type": "service", 
-            "position": { "x": 0, "y": 0 }, 
-            "data": { 
-                "label": "Nome do Serviço", 
-                "type": "service",
-                "databases": [
-                    { "id": "db_gen_1", "label": "Oracle Primary" },
-                    { "id": "db_gen_2", "label": "Redis Cache" }
-                ]
-            } 
-          }
-        ],
-        "edges": [
-          { "id": "e1", "source": "unique_id_1", "target": "unique_id_2", "label": "REST" }
-        ]
-      }
-    `;
-
-    const response = await generateWithFallback(ai, prompt, {
-      responseMimeType: "application/json"
-    });
-
+// Helper para processar a resposta JSON da IA
+const processAIResponse = (response: any) => {
     let jsonStr = response.text || "";
     
     // Limpeza robusta
@@ -206,6 +122,68 @@ export const generateDiagramFromText = async (description: string): Promise<{ no
       nodes: nodes,
       edges: result.edges
     };
+};
+
+const COMMON_SYSTEM_PROMPT = `
+      Atue como um gerador de diagramas de arquitetura React Flow altamente especializado.
+      
+      REGRAS CRÍTICAS DE COMPORTAMENTO (Siga estritamente):
+
+      1. REGRA DE BANCO DE DADOS (Internalização e Quantidade):
+         - Se a descrição diz que um serviço "tem um banco", "usa oracle", "salva dados":
+           NÃO crie um nó separado do tipo "database". O banco deve ser interno.
+         - QUANTIDADE: Se o usuário disser "tem 2 bancos", "possui 3 bases de dados", etc:
+           Você deve preencher a propriedade "databases" dentro de "data".
+           Esta propriedade deve ser um ARRAY de objetos.
+           Exemplo para 2 bancos: "databases": [{ "id": "db_gen_1", "label": "DB Vendas" }, { "id": "db_gen_2", "label": "DB Log" }]
+         - Se a quantidade não for especificada, mas disser que tem banco, crie um array com 1 objeto padrão.
+
+      2. REGRA DE ISOLAMENTO VISUAL (Duplicação de Nós REST):
+         - Objetivo: Clareza visual absoluta. O diagrama deve ser lido da esquerda para a direita sem linhas cruzando a tela inteira.
+         - Se "Serviço A" e "Serviço B" chamam o "Serviço C":
+           VOCÊ DEVE CRIAR DUAS CÓPIAS VISUAIS DO "Serviço C".
+           - Cópia 1: ID "svc_c_1", posicionado imediatamente à direita do "Serviço A".
+           - Cópia 2: ID "svc_c_2", posicionado imediatamente à direita do "Serviço B".
+         - NUNCA reutilize o mesmo nó de destino para chamadores distantes. Cada fluxo deve parecer independente.
+
+      3. LAYOUT E POSICIONAMENTO:
+         - Fluxo: Esquerda (x: 0) -> Direita (x: growing).
+         - Proximidade: O serviço chamado deve estar EXATAMENTE à direita do seu chamador (Offset X: +300px).
+         - Alinhamento Vertical: Se um serviço chama 3 outros, empilhe-os verticalmente com espaçamento de 150px no eixo Y, todos alinhados no mesmo eixo X.
+      
+      4. TIPOS DE NÓS:
+         - 'service' (Microserviços, APIs)
+         - 'queue' (Filas, Tópicos, MQ)
+         - 'external' (Sistemas terceiros)
+         - 'database' (APENAS para DBs soltos, não vinculados a um serviço específico)
+
+      5. FORMATO DE SAÍDA:
+         - Retorne APENAS um objeto JSON válido.
+         - NÃO inclua comentários (// ou /* */) dentro do JSON.
+         - NÃO use trailing commas.
+`;
+
+export const generateDiagramFromText = async (description: string): Promise<{ nodes: Node<CustomNodeData>[], edges: Edge[] }> => {
+  const apiKey = process.env.API_KEY;
+
+  if (!apiKey) {
+    throw new Error("API Key não encontrada.");
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+
+    const prompt = `
+      ${COMMON_SYSTEM_PROMPT}
+      
+      Descrição do usuário: "${description}".
+    `;
+
+    const response = await generateWithFallback(ai, prompt, {
+      responseMimeType: "application/json"
+    });
+
+    return processAIResponse(response);
 
   } catch (error) {
     console.error("Gemini Generation Failed:", error);
