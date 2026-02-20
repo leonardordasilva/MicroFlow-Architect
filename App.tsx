@@ -18,7 +18,7 @@ import ReactFlow, {
   ConnectionMode,
   NodeDragHandler,
 } from 'reactflow';
-import { Layers, Trash2, Mail, Box, Hand, MousePointer2, Download, PenLine, Sparkles, LayoutTemplate, Undo2, Redo2 } from 'lucide-react';
+import { Layers, Trash2, Mail, Box, Hand, MousePointer2, Download, PenLine, Sparkles, LayoutTemplate, Undo2, Redo2, FileJson, UploadCloud } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
 import CustomNode from './components/CustomNode';
@@ -27,6 +27,7 @@ import QuantityModal from './components/QuantityModal';
 import ConfirmationModal from './components/ConfirmationModal';
 import NameModal from './components/NameModal';
 import TextToDiagramModal from './components/TextToDiagramModal';
+import ImportModal from './components/ImportModal'; // Updated path
 import { initialNodes, initialEdges, defaultEdgeOptions } from './constants';
 import { CustomNodeData, NodeType, InternalDatabase, InternalService } from './types';
 import { generateDiagramFromText } from './services/geminiService';
@@ -121,6 +122,7 @@ function AppContent() {
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
   const [isTextToDiagramOpen, setIsTextToDiagramOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   
   const [pendingConnection, setPendingConnection] = useState<{
     sourceId: string;
@@ -129,7 +131,7 @@ function AppContent() {
     direction: 'right' | 'bottom';
   } | null>(null);
 
-  const { getNode, fitView } = useReactFlow();
+  const { getNode, fitView, getNodes, getEdges } = useReactFlow();
 
   // --- HISTORY MANAGEMENT ---
 
@@ -496,7 +498,7 @@ function AppContent() {
             if (targetType === NodeType.DATABASE) {
                 const newDbs: InternalDatabase[] = Array.from({ length: count }).map((_, i) => ({
                     id: generateDbId(),
-                    label: `Oracle DB ${i + 1}`
+                    label: 'Oracle DB'
                 }));
                 const existingDbs = node.data.databases || [];
                 return {
@@ -536,7 +538,7 @@ function AppContent() {
     setPendingConnection(null);
   };
 
-  // Process generated nodes to add interactivity methods
+  // Process generated nodes (from AI or JSON Import) to add interactivity methods
   const processGeneratedElements = (newNodes: Node<CustomNodeData>[], newEdges: Edge[]) => {
       const interactiveNodes = newNodes.map(n => {
         let databases: InternalDatabase[] = [];
@@ -578,8 +580,10 @@ function AppContent() {
       });
 
       const interactiveEdges = newEdges.map(e => {
-        const sourceNode = interactiveNodes.find(n => n.id === e.source);
-        const targetNode = interactiveNodes.find(n => n.id === e.target);
+        // Attempt to find node in new set, otherwise try existing nodes
+        const sourceNode = interactiveNodes.find(n => n.id === e.source) || nodes.find(n => n.id === e.source);
+        const targetNode = interactiveNodes.find(n => n.id === e.target) || nodes.find(n => n.id === e.target);
+        
         const params = getEdgeParams(
           (sourceNode?.data.type as NodeType) || NodeType.SERVICE, 
           (targetNode?.data.type as NodeType) || NodeType.SERVICE
@@ -608,6 +612,60 @@ function AppContent() {
     
     // Auto layout after generation (Reset to LR)
     applyAutoLayout(interactiveNodes, interactiveEdges);
+  };
+
+  // Unified Handler for Importing Content (JSON)
+  const handleImportContent = async (content: string, type: 'json') => {
+    takeSnapshot();
+
+    if (type === 'json') {
+      try {
+        const parsed = JSON.parse(content);
+        
+        // Basic validation
+        if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) {
+            throw new Error("Formato JSON inválido: 'nodes' e 'edges' são obrigatórios.");
+        }
+
+        if (parsed.title) {
+            setDiagramTitle(parsed.title);
+        }
+
+        // Restore interactivity hooks
+        const { interactiveNodes, interactiveEdges } = processGeneratedElements(parsed.nodes, parsed.edges);
+
+        setNodes(interactiveNodes);
+        setEdges(interactiveEdges);
+        
+        setTimeout(() => fitView({ padding: 0.3, duration: 500 }), 100);
+
+      } catch (err) {
+        console.error("Erro ao importar JSON:", err);
+        throw new Error("Erro ao processar o arquivo JSON. Verifique se é um banco de dados válido.");
+      }
+    }
+  };
+
+  // Export JSON Handler
+  const handleDownloadJSON = () => {
+    const data = {
+        title: diagramTitle,
+        timestamp: new Date().toISOString(),
+        nodes: getNodes(),
+        edges: getEdges(),
+    };
+
+    // Clean data (optional: removing non-serializable function refs if desired, but JSON.stringify does this automatically by ignoring functions)
+    const jsonString = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${diagramTitle.replace(/\s+/g, '-').toLowerCase()}.json`;
+    a.click();
+    
+    URL.revokeObjectURL(url);
   };
 
   // Helper to apply layout after generation
@@ -766,14 +824,24 @@ function AppContent() {
             <span className="text-sm font-medium hidden md:inline max-w-[150px] truncate">{diagramTitle}</span>
           </button>
 
-          {/* AI Generator Button */}
+          {/* AI Generator Button (Text) */}
           <button
             onClick={() => setIsTextToDiagramOpen(true)}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-colors mr-2 shadow-md shadow-purple-600/20 active:scale-95"
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-colors mr-1 shadow-md shadow-purple-600/20 active:scale-95"
             title="Gerar Diagrama com IA (Texto)"
           >
             <Sparkles className="w-4 h-4" />
             <span className="hidden md:inline font-medium">IA Texto</span>
+          </button>
+
+          {/* Import Button (JSON) */}
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-lg transition-colors mr-2 shadow-md shadow-amber-500/20 active:scale-95"
+            title="Importar (JSON)"
+          >
+            <UploadCloud className="w-4 h-4" />
+            <span className="hidden md:inline font-medium">Importar</span>
           </button>
           
            {nodes.length > 0 && (
@@ -786,26 +854,6 @@ function AppContent() {
                <span className="hidden lg:inline text-sm font-medium">Layout</span>
              </button>
            )}
-
-          <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-1"></div>
-
-          {/* Interaction Mode Toggle */}
-          <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700 mr-2">
-            <button 
-              onClick={() => setInteractionMode('pan')}
-              className={`p-1.5 rounded-md transition-colors ${interactionMode === 'pan' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-              title="Modo Pan (Mover Tela)"
-            >
-              <Hand className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={() => setInteractionMode('select')}
-              className={`p-1.5 rounded-md transition-colors ${interactionMode === 'select' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-              title="Modo Seleção (Caixa de Seleção)"
-            >
-              <MousePointer2 className="w-4 h-4" />
-            </button>
-          </div>
 
           <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-1"></div>
 
@@ -823,6 +871,15 @@ function AppContent() {
           >
             <Box className="w-5 h-5" />
             <span className="hidden sm:inline">Microserviço</span>
+          </button>
+          
+           {/* Export JSON Button */}
+           <button
+            onClick={handleDownloadJSON}
+            className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors cursor-pointer"
+            title="Exportar para JSON (Backup)"
+          >
+            <FileJson className="w-5 h-5" />
           </button>
 
            <button
@@ -896,6 +953,10 @@ function AppContent() {
                       <Sparkles className="w-3 h-3" />
                       Gerar com IA
                     </button>
+                    <button onClick={() => setIsImportModalOpen(true)} className="text-sm bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors flex items-center gap-1">
+                      <UploadCloud className="w-3 h-3" />
+                      Importar JSON
+                    </button>
                 </div>
               </div>
             </div>
@@ -939,6 +1000,12 @@ function AppContent() {
         isOpen={isTextToDiagramOpen}
         onClose={() => setIsTextToDiagramOpen(false)}
         onGenerate={handleGenerateDiagram}
+      />
+
+      <ImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImportContent}
       />
 
       <ConfirmationModal

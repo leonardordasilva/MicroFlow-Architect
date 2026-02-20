@@ -5,21 +5,24 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@google/genai": "^0.2.0",
+    "@types/dagre": "^0.7.53",
+    "dagre": "^0.8.5",
+    "html-to-image": "^1.11.11",
+    "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "lucide-react": "^0.344.0",
-    "@google/genai": "^0.2.0",
-    "reactflow": "^11.11.4",
-    "html-to-image": "^1.11.11",
-    "react-markdown": "^9.0.1"
+    "react-markdown": "^9.0.1",
+    "reactflow": "^11.11.4"
   },
   "devDependencies": {
+    "@types/node": "^20.11.24",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
-    "@types/node": "^20.11.24",
     "@vitejs/plugin-react": "^4.2.1",
     "typescript": "^5.2.2",
     "vite": "^5.2.0"

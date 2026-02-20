@@ -12,7 +12,7 @@ const MODELS = [
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const generateWithFallback = async (ai: GoogleGenAI, prompt: string | any[], config: any = {}) => {
+const generateWithFallback = async (ai: GoogleGenAI, contents: any, config: any = {}) => {
   let lastError: any;
 
   for (const model of MODELS) {
@@ -20,7 +20,7 @@ const generateWithFallback = async (ai: GoogleGenAI, prompt: string | any[], con
       console.log(`Tentando modelo: ${model}`);
       return await ai.models.generateContent({
         model: model,
-        contents: prompt,
+        contents: contents, // contents can be string or array of parts
         config: config
       });
     } catch (error: any) {
@@ -92,36 +92,130 @@ export const analyzeArchitecture = async (nodes: Node<CustomNodeData>[], edges: 
   }
 };
 
+// Helper robusto para extrair JSON usando contagem de chaves/colchetes
+const extractJSON = (str: string) => {
+  const firstOpen = str.indexOf('{');
+  const firstArray = str.indexOf('[');
+  
+  let startIndex = -1;
+  if (firstOpen !== -1 && firstArray !== -1) {
+    startIndex = Math.min(firstOpen, firstArray);
+  } else if (firstOpen !== -1) {
+    startIndex = firstOpen;
+  } else if (firstArray !== -1) {
+    startIndex = firstArray;
+  } else {
+    return null;
+  }
+  
+  const isObject = str[startIndex] === '{';
+  let stack = 0;
+  let inString = false;
+  let escape = false;
+
+  for (let i = startIndex; i < str.length; i++) {
+    const char = str[i];
+    
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    
+    if (char === '\\') {
+      escape = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString) {
+      if (isObject) {
+        if (char === '{') stack++;
+        else if (char === '}') stack--;
+      } else {
+        if (char === '[') stack++;
+        else if (char === ']') stack--;
+      }
+
+      if (stack === 0) {
+        return str.substring(startIndex, i + 1);
+      }
+    }
+  }
+  return null;
+};
+
 // Helper para processar a resposta JSON da IA
 const processAIResponse = (response: any) => {
     let jsonStr = response.text || "";
     
-    // Limpeza robusta
-    jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
+    // Tenta extrair o primeiro JSON válido
+    const extracted = extractJSON(jsonStr);
     
-    const firstBrace = jsonStr.indexOf('{');
-    const lastBrace = jsonStr.lastIndexOf('}');
-    
-    if (firstBrace !== -1 && lastBrace !== -1) {
-      jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+    if (extracted) {
+        jsonStr = extracted;
+    } else {
+        // Fallback para limpeza básica se a extração falhar
+        jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
+        
+        const firstOpen = jsonStr.indexOf('{');
+        const firstArray = jsonStr.indexOf('[');
+        let start = -1;
+        let endChar = '';
+
+        if (firstOpen !== -1 && (firstArray === -1 || firstOpen < firstArray)) {
+             start = firstOpen;
+             endChar = '}';
+        } else if (firstArray !== -1) {
+             start = firstArray;
+             endChar = ']';
+        }
+
+        if (start !== -1) {
+            const lastEnd = jsonStr.lastIndexOf(endChar);
+            if (lastEnd !== -1) {
+                jsonStr = jsonStr.substring(start, lastEnd + 1);
+            } else {
+                jsonStr = jsonStr.substring(start);
+            }
+        }
     }
 
-    jsonStr = jsonStr.trim();
+    try {
+        const result = JSON.parse(jsonStr);
+        
+        let nodes: any[] = [];
+        let edges: any[] = [];
 
-    const result = JSON.parse(jsonStr);
-    
-    const nodes = result.nodes.map((n: any) => ({
-      ...n,
-      data: { 
-        ...n.data, 
-        type: n.type
-      }
-    }));
+        // Verifica se o resultado é um array (formato plano) ou objeto {nodes, edges}
+        if (Array.isArray(result)) {
+            // Heurística: Itens com 'source' e 'target' são arestas, o resto são nós
+            nodes = result.filter((item: any) => !item.source && !item.target);
+            edges = result.filter((item: any) => item.source && item.target);
+        } else if (result && typeof result === 'object') {
+            nodes = result.nodes || [];
+            edges = result.edges || [];
+        }
 
-    return {
-      nodes: nodes,
-      edges: result.edges
-    };
+        const processedNodes = nodes.map((n: any) => ({
+          ...n,
+          data: { 
+            ...n.data, 
+            type: n.data?.type || n.type || 'service' 
+          }
+        }));
+
+        return {
+          nodes: processedNodes,
+          edges: edges
+        };
+    } catch (e) {
+        console.error("Erro ao fazer parse do JSON:", jsonStr);
+        throw new Error("A IA retornou um formato inválido. Tente novamente.");
+    }
 };
 
 const COMMON_SYSTEM_PROMPT = `
@@ -159,6 +253,8 @@ const COMMON_SYSTEM_PROMPT = `
 
       5. FORMATO DE SAÍDA:
          - Retorne APENAS um objeto JSON válido.
+         - Prefira a estrutura: { "nodes": [...], "edges": [...] }
+         - Se retornar um array único, certifique-se que edges tenham 'source' e 'target'.
          - NÃO inclua comentários (// ou /* */) dentro do JSON.
          - NÃO use trailing commas.
 `;

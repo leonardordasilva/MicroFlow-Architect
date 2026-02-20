@@ -7,7 +7,7 @@ const getSmartPath = ({
   sourceX, sourceY, sourcePosition, 
   targetX, targetY, targetPosition, 
   centerX, centerY, borderRadius = 5
-}: any) => {
+}: any): [string, number, number] => {
   const isVerticalU = (sourcePosition === Position.Bottom && targetPosition === Position.Bottom) || 
                       (sourcePosition === Position.Top && targetPosition === Position.Top);
                       
@@ -82,7 +82,8 @@ const getSmartPath = ({
   }
 
   // Fallback to library default for S-shapes or normal connections
-  return getSmoothStepPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, centerX, centerY, borderRadius });
+  const [path, lx, ly] = getSmoothStepPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, centerX, centerY, borderRadius });
+  return [path, lx, ly];
 };
 
 export default function CustomEdge({
@@ -253,7 +254,7 @@ export default function CustomEdge({
 
   return (
     <>
-      <BaseEdge path={edgePath} markerEnd={markerEnd} style={edgeStyle} interactionWidth={20} />
+      <BaseEdge path={edgePath} markerEnd={markerEnd as any} style={edgeStyle as any} interactionWidth={20} />
       <EdgeLabelRenderer>
         
         {/* 1. LABEL RENDERER */}
