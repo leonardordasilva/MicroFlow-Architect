@@ -34,7 +34,8 @@ export default function SpawnFromNodeModal({
   onConfirm,
 }: SpawnFromNodeModalProps) {
   const isQueue = sourceNodeType === 'queue';
-  const [type, setType] = useState<NodeType>(isQueue ? 'service' : 'service');
+  const isService = sourceNodeType === 'service';
+  const [type, setType] = useState<NodeType>(isService ? 'database' : 'service');
   const [subType, setSubType] = useState('Oracle');
   const [count, setCount] = useState(1);
 
@@ -74,7 +75,7 @@ export default function SpawnFromNodeModal({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="z-50">
-                  <SelectItem value="service">Microserviço</SelectItem>
+                  {sourceNodeType !== 'service' && <SelectItem value="service">Microserviço</SelectItem>}
                   <SelectItem value="database">Banco de Dados</SelectItem>
                   <SelectItem value="queue">MQ</SelectItem>
                   <SelectItem value="external">REST</SelectItem>
