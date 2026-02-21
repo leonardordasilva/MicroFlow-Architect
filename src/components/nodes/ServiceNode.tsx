@@ -1,7 +1,32 @@
 import { memo, useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Box, Database, Pencil, Trash2 } from 'lucide-react';
+import { Box, Database } from 'lucide-react';
 import type { DiagramNodeData } from '@/types/diagram';
+
+function EditableDbItem({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(value);
+
+  const commit = () => {
+    setEditing(false);
+    onChange(text);
+  };
+
+  return editing ? (
+    <input
+      className="bg-transparent border-b border-[hsl(var(--node-database))] text-xs text-foreground outline-none w-full ml-1"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === 'Enter' && commit()}
+      autoFocus
+    />
+  ) : (
+    <span className="cursor-pointer truncate" onDoubleClick={() => setEditing(true)}>
+      {value}
+    </span>
+  );
+}
 
 const ServiceNode = memo(({ data, id, selected }: NodeProps) => {
   const nodeData = data as unknown as DiagramNodeData;
@@ -12,6 +37,12 @@ const ServiceNode = memo(({ data, id, selected }: NodeProps) => {
   const handleBlur = () => {
     setEditing(false);
     nodeData.label = label;
+  };
+
+  const handleDbRename = (index: number, newName: string) => {
+    if (nodeData.internalDatabases) {
+      nodeData.internalDatabases[index] = newName;
+    }
   };
 
   return (
@@ -55,7 +86,7 @@ const ServiceNode = memo(({ data, id, selected }: NodeProps) => {
           {nodeData.internalDatabases.map((db, i) => (
             <div key={i} className="flex items-center gap-1 text-xs text-muted-foreground">
               <Database className="h-3 w-3 text-[hsl(var(--node-database))]" />
-              {db}
+              <EditableDbItem value={db} onChange={(v) => handleDbRename(i, v)} />
             </div>
           ))}
         </div>
