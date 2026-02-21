@@ -7,6 +7,8 @@ import {
   BackgroundVariant,
   type ReactFlowInstance,
 } from '@xyflow/react';
+import { useSnapGuides } from '@/hooks/useSnapGuides';
+import SnapGuideLines from '@/components/SnapGuideLines';
 import { toPng } from 'html-to-image';
 import { toast } from '@/hooks/use-toast';
 import { useDiagram } from '@/hooks/useDiagram';
@@ -44,6 +46,7 @@ export default function DiagramCanvas() {
   const [spawnSource, setSpawnSource] = useState<{ id: string; label: string; nodeType: string } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string; nodeLabel: string } | null>(null);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const { guides, onNodeDrag, onNodeDragStop } = useSnapGuides(nodes);
 
   const toggleDarkMode = useCallback(() => {
     setDarkMode((prev) => {
@@ -144,17 +147,22 @@ export default function DiagramCanvas() {
         />
       </header>
 
-      <div className="flex-1" ref={reactFlowWrapper}>
+      <div className="flex-1 relative" ref={reactFlowWrapper}>
+        <SnapGuideLines guides={guides} />
         <ReactFlow
           nodes={nodes}
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodeDrag={onNodeDrag}
+          onNodeDragStop={onNodeDragStop}
           onNodeContextMenu={handleNodeContextMenu}
           onPaneClick={handlePaneClick}
           nodeTypes={nodeTypes}
           fitView
+          snapToGrid
+          snapGrid={[10, 10]}
           defaultEdgeOptions={{
             type: 'smoothstep',
             animated: true,
