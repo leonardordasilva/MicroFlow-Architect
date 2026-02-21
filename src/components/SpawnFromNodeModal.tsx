@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -35,11 +35,19 @@ export default function SpawnFromNodeModal({
 }: SpawnFromNodeModalProps) {
   const isQueue = sourceNodeType === 'queue';
   const isService = sourceNodeType === 'service';
-  const [type, setType] = useState<NodeType>(isService ? 'database' : 'service');
+  const [type, setType] = useState<NodeType>('database');
   const [subType, setSubType] = useState('Oracle');
   const [count, setCount] = useState(1);
 
-  // Reset type when source changes
+  // Reset state when modal opens
+  useEffect(() => {
+    if (open) {
+      setType(isService ? 'database' : isQueue ? 'service' : 'service');
+      setSubType('Oracle');
+      setCount(1);
+    }
+  }, [open, isService, isQueue]);
+
   const effectiveType = isQueue ? 'service' : type;
 
   const handleConfirm = () => {
