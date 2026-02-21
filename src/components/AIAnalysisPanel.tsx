@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import DOMPurify from 'dompurify';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Brain, Loader2 } from 'lucide-react';
@@ -72,7 +73,7 @@ export default function AIAnalysisPanel({ open, onOpenChange, nodes, edges }: AI
 
           {analysis && (
             <div className="prose prose-sm dark:prose-invert max-w-none rounded-lg border bg-muted/50 p-4">
-              <div dangerouslySetInnerHTML={{ __html: analysis.replace(/\n/g, '<br/>') }} />
+              <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(analysis.replace(/\n/g, '<br/>'), { ALLOWED_TAGS: ['br', 'p', 'strong', 'em', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'code', 'pre', 'blockquote'] }) }} />
             </div>
           )}
         </div>
