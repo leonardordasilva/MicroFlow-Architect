@@ -19,6 +19,8 @@ import Toolbar from '@/components/Toolbar';
 import AIGenerateModal from '@/components/AIGenerateModal';
 import AIAnalysisPanel from '@/components/AIAnalysisPanel';
 import ImportJSONModal from '@/components/ImportJSONModal';
+import SpawnFromNodeModal from '@/components/SpawnFromNodeModal';
+import type { NodeType, DiagramNodeData } from '@/types/diagram';
 
 const nodeTypes = {
   service: ServiceNode,
@@ -31,7 +33,7 @@ export default function DiagramCanvas() {
   const {
     nodes, edges, diagramName, setDiagramName,
     onNodesChange, onEdgesChange, onConnect,
-    addNode, deleteSelected, undo, redo, autoLayout,
+    addNode, addNodesFromSource, deleteSelected, undo, redo, autoLayout,
     clearCanvas, loadDiagram, exportJSON, setNodes, setEdges,
   } = useDiagram();
 
@@ -39,6 +41,8 @@ export default function DiagramCanvas() {
   const [showAIGenerate, setShowAIGenerate] = useState(false);
   const [showAIAnalysis, setShowAIAnalysis] = useState(false);
   const [showImportJSON, setShowImportJSON] = useState(false);
+  const [spawnSource, setSpawnSource] = useState<{ id: string; label: string } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string; nodeLabel: string } | null>(null);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
   const toggleDarkMode = useCallback(() => {
@@ -99,6 +103,24 @@ export default function DiagramCanvas() {
     [deleteSelected, undo, redo]
   );
 
+  const handleNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: any) => {
+      event.preventDefault();
+      const nodeData = node.data as DiagramNodeData;
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        nodeId: node.id,
+        nodeLabel: nodeData.label,
+      });
+    },
+    []
+  );
+
+  const handlePaneClick = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
   return (
     <div className="flex h-screen w-screen flex-col bg-background" onKeyDown={handleKeyDown} tabIndex={0}>
       <header className="flex items-center justify-center border-b bg-card/80 px-4 py-2 backdrop-blur-sm">
@@ -127,6 +149,8 @@ export default function DiagramCanvas() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodeContextMenu={handleNodeContextMenu}
+          onPaneClick={handlePaneClick}
           nodeTypes={nodeTypes}
           fitView
           defaultEdgeOptions={{
@@ -151,6 +175,24 @@ export default function DiagramCanvas() {
             }}
           />
         </ReactFlow>
+
+        {/* Context Menu */}
+        {contextMenu && (
+          <div
+            className="fixed z-50 rounded-md border bg-popover p-1 shadow-md min-w-[180px]"
+            style={{ top: contextMenu.y, left: contextMenu.x }}
+          >
+            <button
+              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground"
+              onClick={() => {
+                setSpawnSource({ id: contextMenu.nodeId, label: contextMenu.nodeLabel });
+                setContextMenu(null);
+              }}
+            >
+              Criar objetos a partir deste
+            </button>
+          </div>
+        )}
       </div>
 
       <AIGenerateModal
@@ -173,6 +215,17 @@ export default function DiagramCanvas() {
         open={showImportJSON}
         onOpenChange={setShowImportJSON}
         onImport={handleImport}
+      />
+
+      <SpawnFromNodeModal
+        open={!!spawnSource}
+        onOpenChange={(open) => { if (!open) setSpawnSource(null); }}
+        sourceNodeLabel={spawnSource?.label || ''}
+        onConfirm={(type, count, subType) => {
+          if (spawnSource) {
+            addNodesFromSource(spawnSource.id, type, count, subType);
+          }
+        }}
       />
     </div>
   );

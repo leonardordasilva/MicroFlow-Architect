@@ -113,6 +113,50 @@ export function useDiagram() {
     [nodes, edges, pushHistory]
   );
 
+  const addNodesFromSource = useCallback(
+    (sourceNodeId: string, type: NodeType, count: number, subType?: string) => {
+      pushHistory();
+      const sourceNode = nodes.find((n) => n.id === sourceNodeId);
+      if (!sourceNode) return;
+
+      const labelMap: Record<NodeType, string> = {
+        service: 'Microserviço',
+        database: subType || 'Oracle',
+        queue: 'MQ',
+        external: 'REST',
+      };
+
+      const newNodes: DiagramNode[] = [];
+      const newEdges: DiagramEdge[] = [];
+
+      for (let i = 0; i < count; i++) {
+        const id = createNodeId();
+        newNodes.push({
+          id,
+          type,
+          position: {
+            x: sourceNode.position.x + 250,
+            y: sourceNode.position.y + i * 120 - ((count - 1) * 60),
+          },
+          data: { label: `${labelMap[type]} ${count > 1 ? i + 1 : ''}`.trim(), type, subType, internalDatabases: [], internalServices: [] },
+        });
+        newEdges.push({
+          id: `edge_${sourceNodeId}_${id}`,
+          source: sourceNodeId,
+          target: id,
+          type: 'smoothstep',
+          animated: true,
+          style: { strokeWidth: 2 },
+          markerEnd: { type: 'arrowclosed' as any },
+        });
+      }
+
+      setNodes((prev) => [...prev, ...newNodes]);
+      setEdges((prev) => [...prev, ...newEdges]);
+    },
+    [nodes, pushHistory]
+  );
+
   const clearCanvas = useCallback(() => {
     pushHistory();
     setNodes([]);
@@ -140,6 +184,7 @@ export function useDiagram() {
     onEdgesChange,
     onConnect,
     addNode,
+    addNodesFromSource,
     deleteSelected,
     undo,
     redo,
