@@ -42,7 +42,7 @@ const ExternalNode = memo(({ data, selected }: NodeProps) => {
           </span>
         )}
       </div>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Externo</div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">REST</div>
 
       <Handle type="source" position={Position.Bottom} className="!w-3 !h-3 !bg-[hsl(var(--node-external))]" />
       <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-[hsl(var(--node-external))]" />

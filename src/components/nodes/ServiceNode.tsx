@@ -47,7 +47,7 @@ const ServiceNode = memo(({ data, id, selected }: NodeProps) => {
       </div>
 
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-        Serviço
+        Microserviço
       </div>
 
       {nodeData.internalDatabases && nodeData.internalDatabases.length > 0 && (

@@ -42,7 +42,7 @@ const QueueNode = memo(({ data, selected }: NodeProps) => {
           </span>
         )}
       </div>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Fila</div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">MQ</div>
 
       <Handle type="source" position={Position.Bottom} className="!w-3 !h-3 !bg-[hsl(var(--node-queue))]" />
       <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-[hsl(var(--node-queue))]" />

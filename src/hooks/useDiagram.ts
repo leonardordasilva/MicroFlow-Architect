@@ -60,10 +60,10 @@ export function useDiagram() {
     (type: NodeType) => {
       pushHistory();
       const labelMap: Record<NodeType, string> = {
-        service: 'Novo Serviço',
-        database: 'Novo Banco',
-        queue: 'Nova Fila',
-        external: 'Serviço Externo',
+        service: 'Microserviço',
+        database: 'Oracle',
+        queue: 'MQ',
+        external: 'REST',
       };
       const newNode: DiagramNode = {
         id: createNodeId(),

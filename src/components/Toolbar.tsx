@@ -66,10 +66,10 @@ export default function Toolbar({
 
       <Separator orientation="vertical" className="h-6" />
 
-      <ToolbarButton icon={Box} label="Serviço" onClick={() => onAddNode('service')} />
-      <ToolbarButton icon={Database} label="Banco de Dados" onClick={() => onAddNode('database')} />
-      <ToolbarButton icon={Mail} label="Fila" onClick={() => onAddNode('queue')} />
-      <ToolbarButton icon={Globe} label="Externo" onClick={() => onAddNode('external')} />
+      <ToolbarButton icon={Box} label="Microserviço" onClick={() => onAddNode('service')} />
+      <ToolbarButton icon={Database} label="Oracle" onClick={() => onAddNode('database')} />
+      <ToolbarButton icon={Mail} label="MQ" onClick={() => onAddNode('queue')} />
+      <ToolbarButton icon={Globe} label="REST" onClick={() => onAddNode('external')} />
 
       <Separator orientation="vertical" className="h-6" />
 
