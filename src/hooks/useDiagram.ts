@@ -40,6 +40,18 @@ export function useDiagram() {
   const onConnect = useCallback(
     (connection: Connection) => {
       pushHistory();
+
+      // Determine label based on source/target types
+      const sourceNode = nodes.find((n) => n.id === connection.source);
+      const targetNode = nodes.find((n) => n.id === connection.target);
+      let edgeLabel: string | undefined;
+
+      if (sourceNode?.type === 'service' && targetNode?.type === 'queue') {
+        edgeLabel = 'produce';
+      } else if (sourceNode?.type === 'queue' && targetNode?.type === 'service') {
+        edgeLabel = 'consume';
+      }
+
       setEdges((eds) =>
         addEdge(
           {
@@ -48,12 +60,13 @@ export function useDiagram() {
             animated: true,
             style: { strokeWidth: 2 },
             markerEnd: { type: 'arrowclosed' as any },
+            ...(edgeLabel ? { label: edgeLabel, labelStyle: { fontSize: 11, fontWeight: 600 } } : {}),
           },
           eds
         ) as DiagramEdge[]
       );
     },
-    [pushHistory]
+    [pushHistory, nodes]
   );
 
   const addNode = useCallback(
