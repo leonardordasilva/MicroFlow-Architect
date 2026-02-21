@@ -148,7 +148,6 @@ export default function DiagramCanvas() {
       </header>
 
       <div className="flex-1 relative" ref={reactFlowWrapper}>
-        <SnapGuideLines guides={guides} />
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -170,6 +169,7 @@ export default function DiagramCanvas() {
           }}
           proOptions={{ hideAttribution: true }}
         >
+          <SnapGuideLines guides={guides} />
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
           <Controls className="!bg-card !border-border !shadow-md [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-foreground" />
           <MiniMap
