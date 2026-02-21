@@ -7,7 +7,7 @@ import {
   type NodeChange,
   type EdgeChange,
 } from '@xyflow/react';
-import type { DiagramNode, DiagramEdge, NodeType, HistoryEntry } from '@/types/diagram';
+import type { DiagramNode, DiagramEdge, DiagramNodeData, NodeType, HistoryEntry } from '@/types/diagram';
 import { getLayoutedElements } from '@/services/layoutService';
 
 const createNodeId = () => `node_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -118,6 +118,25 @@ export function useDiagram() {
       pushHistory();
       const sourceNode = nodes.find((n) => n.id === sourceNodeId);
       if (!sourceNode) return;
+
+      const sourceData = sourceNode.data as unknown as DiagramNodeData;
+
+      // If adding Oracle from a service node, embed it inside the service
+      if (type === 'database' && subType === 'Oracle' && sourceNode.type === 'service') {
+        const currentDbs = sourceData.internalDatabases || [];
+        const newDbs = [...currentDbs];
+        for (let i = 0; i < count; i++) {
+          newDbs.push(`Oracle ${currentDbs.length + i + 1}`);
+        }
+        setNodes((prev) =>
+          prev.map((n) =>
+            n.id === sourceNodeId
+              ? { ...n, data: { ...n.data, internalDatabases: newDbs } }
+              : n
+          )
+        );
+        return;
+      }
 
       const labelMap: Record<NodeType, string> = {
         service: 'Microserviço',
