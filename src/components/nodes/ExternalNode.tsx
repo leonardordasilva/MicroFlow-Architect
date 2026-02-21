@@ -20,8 +20,10 @@ const ExternalNode = memo(({ data, selected }: NodeProps) => {
         selected ? 'border-[hsl(var(--node-external))] shadow-lg ring-2 ring-[hsl(var(--node-external))]/30' : 'border-border'
       }`}
     >
-      <Handle type="target" position={Position.Top} className="!w-3 !h-3 !bg-[hsl(var(--node-external))]" />
-      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-[hsl(var(--node-external))]" />
+      <Handle id="top-target" type="target" position={Position.Top} className="!w-3 !h-3 !bg-[hsl(var(--node-external))]" />
+      <Handle id="top-source" type="source" position={Position.Top} className="!w-3 !h-3 !bg-[hsl(var(--node-external))]" />
+      <Handle id="left-target" type="target" position={Position.Left} className="!w-3 !h-3 !bg-[hsl(var(--node-external))]" />
+      <Handle id="left-source" type="source" position={Position.Left} className="!w-3 !h-3 !bg-[hsl(var(--node-external))]" />
 
       <div className="flex items-center gap-2 mb-1">
         <div className="rounded-md bg-[hsl(var(--node-external))]/15 p-1.5">
@@ -44,8 +46,10 @@ const ExternalNode = memo(({ data, selected }: NodeProps) => {
       </div>
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">REST</div>
 
-      <Handle type="source" position={Position.Bottom} className="!w-3 !h-3 !bg-[hsl(var(--node-external))]" />
-      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-[hsl(var(--node-external))]" />
+      <Handle id="bottom-target" type="target" position={Position.Bottom} className="!w-3 !h-3 !bg-[hsl(var(--node-external))]" />
+      <Handle id="bottom-source" type="source" position={Position.Bottom} className="!w-3 !h-3 !bg-[hsl(var(--node-external))]" />
+      <Handle id="right-target" type="target" position={Position.Right} className="!w-3 !h-3 !bg-[hsl(var(--node-external))]" />
+      <Handle id="right-source" type="source" position={Position.Right} className="!w-3 !h-3 !bg-[hsl(var(--node-external))]" />
     </div>
   );
 });
