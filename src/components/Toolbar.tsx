@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import {
   Box, Database, Mail, Globe, Trash2, Undo2, Redo2, LayoutGrid,
-  Download, Upload, Image, Sparkles, Brain, FileText, Moon, Sun, ChevronDown,
+  Download, Upload, Image, Sparkles, Brain, Moon, Sun, ChevronDown, XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -12,6 +12,7 @@ import type { NodeType } from '@/types/diagram';
 interface ToolbarProps {
   onAddNode: (type: NodeType, subType?: string) => void;
   onDelete: () => void;
+  onClearCanvas: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onAutoLayout: () => void;
@@ -72,7 +73,7 @@ function DatabaseDropdown({ onSelect }: { onSelect: (subType: string) => void })
 }
 
 export default function Toolbar({
-  onAddNode, onDelete, onUndo, onRedo, onAutoLayout,
+  onAddNode, onDelete, onClearCanvas, onUndo, onRedo, onAutoLayout,
   onExportPNG, onExportJSON, onImportJSON,
   onOpenAIGenerate, onOpenAIAnalyze,
   diagramName, onDiagramNameChange,
@@ -97,6 +98,7 @@ export default function Toolbar({
       <Separator orientation="vertical" className="h-6" />
 
       <ToolbarButton icon={Trash2} label="Deletar (Del)" onClick={onDelete} />
+      <ToolbarButton icon={XCircle} label="Limpar Diagrama" onClick={onClearCanvas} />
       <ToolbarButton icon={Undo2} label="Desfazer (Ctrl+Z)" onClick={onUndo} />
       <ToolbarButton icon={Redo2} label="Refazer (Ctrl+Y)" onClick={onRedo} />
       <ToolbarButton icon={LayoutGrid} label="Auto Layout" onClick={onAutoLayout} />

@@ -132,6 +132,7 @@ export default function DiagramCanvas() {
         <Toolbar
           onAddNode={addNode}
           onDelete={deleteSelected}
+          onClearCanvas={clearCanvas}
           onUndo={undo}
           onRedo={redo}
           onAutoLayout={() => autoLayout('LR')}
