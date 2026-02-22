@@ -1,5 +1,15 @@
 import { useState, useCallback, useRef } from 'react';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   ReactFlow,
   Background,
   Controls,
@@ -45,6 +55,7 @@ export default function DiagramCanvas() {
   const [showImportJSON, setShowImportJSON] = useState(false);
   const [spawnSource, setSpawnSource] = useState<{ id: string; label: string; nodeType: string } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string; nodeLabel: string } | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { guides, onNodeDrag, onNodeDragStop } = useSnapGuides(nodes);
 
@@ -132,7 +143,7 @@ export default function DiagramCanvas() {
         <Toolbar
           onAddNode={addNode}
           onDelete={deleteSelected}
-          onClearCanvas={clearCanvas}
+          onClearCanvas={() => setShowClearConfirm(true)}
           onUndo={undo}
           onRedo={redo}
           onAutoLayout={() => autoLayout('LR')}
@@ -240,6 +251,20 @@ export default function DiagramCanvas() {
           }
         }}
       />
+      <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Limpar diagrama</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja limpar todo o diagrama? Esta ação pode ser desfeita com Ctrl+Z.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={clearCanvas}>Limpar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
