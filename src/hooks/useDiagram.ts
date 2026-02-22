@@ -172,6 +172,14 @@ export function useDiagram() {
           },
           data: { label: `${labelMap[type]} ${count > 1 ? i + 1 : ''}`.trim(), type, subType, internalDatabases: [], internalServices: [] },
         });
+        // Determine edge label based on source/target types
+        let edgeLabel: string | undefined;
+        if (sourceNode.type === 'service' && type === 'queue') {
+          edgeLabel = 'produce';
+        } else if (sourceNode.type === 'queue' && type === 'service') {
+          edgeLabel = 'consume';
+        }
+
         newEdges.push({
           id: `edge_${sourceNodeId}_${id}`,
           source: sourceNodeId,
@@ -180,6 +188,7 @@ export function useDiagram() {
           animated: true,
           style: { strokeWidth: 2 },
           markerEnd: { type: 'arrowclosed' as any },
+          ...(edgeLabel ? { label: edgeLabel, labelStyle: { fontSize: 11, fontWeight: 600 } } : {}),
         });
       }
 
