@@ -56,10 +56,11 @@ export function useDiagram() {
         addEdge(
           {
             ...connection,
-            type: 'smoothstep',
+            type: 'editable',
             animated: true,
             style: { strokeWidth: 2 },
             markerEnd: { type: 'arrowclosed' as any },
+            data: { controlPoints: [] },
             ...(edgeLabel ? { label: edgeLabel, labelStyle: { fontSize: 11, fontWeight: 600 } } : {}),
           },
           eds
@@ -184,10 +185,11 @@ export function useDiagram() {
           id: `edge_${sourceNodeId}_${id}`,
           source: sourceNodeId,
           target: id,
-          type: 'smoothstep',
+          type: 'editable',
           animated: true,
           style: { strokeWidth: 2 },
           markerEnd: { type: 'arrowclosed' as any },
+          data: { controlPoints: [] },
           ...(edgeLabel ? { label: edgeLabel, labelStyle: { fontSize: 11, fontWeight: 600 } } : {}),
         });
       }
