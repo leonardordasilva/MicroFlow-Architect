@@ -17,7 +17,7 @@ export interface ControlPoint {
 }
 
 export interface DiagramEdgeData {
-  controlPoints?: ControlPoint[];
+  waypoints?: ControlPoint[];
   [key: string]: unknown;
 }
 

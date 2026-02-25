@@ -184,7 +184,7 @@ export default function DiagramCanvas() {
             type: 'editable',
             animated: true,
             style: { strokeWidth: 2 },
-            data: { controlPoints: [] },
+            data: { waypoints: undefined },
           }}
           proOptions={{ hideAttribution: true }}
         >

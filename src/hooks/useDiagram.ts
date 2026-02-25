@@ -60,7 +60,7 @@ export function useDiagram() {
             animated: true,
             style: { strokeWidth: 2 },
             markerEnd: { type: 'arrowclosed' as any },
-            data: { controlPoints: [] },
+            data: { waypoints: undefined },
             ...(edgeLabel ? { label: edgeLabel, labelStyle: { fontSize: 11, fontWeight: 600 } } : {}),
           },
           eds
@@ -189,7 +189,7 @@ export function useDiagram() {
           animated: true,
           style: { strokeWidth: 2 },
           markerEnd: { type: 'arrowclosed' as any },
-          data: { controlPoints: [] },
+          data: { waypoints: undefined },
           ...(edgeLabel ? { label: edgeLabel, labelStyle: { fontSize: 11, fontWeight: 600 } } : {}),
         });
       }
