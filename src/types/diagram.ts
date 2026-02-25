@@ -11,8 +11,18 @@ export interface DiagramNodeData {
   [key: string]: unknown;
 }
 
+export interface ControlPoint {
+  x: number;
+  y: number;
+}
+
+export interface DiagramEdgeData {
+  controlPoints?: ControlPoint[];
+  [key: string]: unknown;
+}
+
 export type DiagramNode = Node<DiagramNodeData>;
-export type DiagramEdge = Edge;
+export type DiagramEdge = Edge<DiagramEdgeData>;
 
 export interface DiagramState {
   nodes: DiagramNode[];

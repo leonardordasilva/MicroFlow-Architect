@@ -27,6 +27,7 @@ import ServiceNode from '@/components/nodes/ServiceNode';
 import DatabaseNode from '@/components/nodes/DatabaseNode';
 import QueueNode from '@/components/nodes/QueueNode';
 import ExternalNode from '@/components/nodes/ExternalNode';
+import EditableEdge from '@/components/edges/EditableEdge';
 import Toolbar from '@/components/Toolbar';
 import AIGenerateModal from '@/components/AIGenerateModal';
 import AIAnalysisPanel from '@/components/AIAnalysisPanel';
@@ -39,6 +40,10 @@ const nodeTypes = {
   database: DatabaseNode,
   queue: QueueNode,
   external: ExternalNode,
+};
+
+const edgeTypes = {
+  editable: EditableEdge,
 };
 
 export default function DiagramCanvas() {
@@ -171,6 +176,7 @@ export default function DiagramCanvas() {
           onNodeContextMenu={handleNodeContextMenu}
           onPaneClick={handlePaneClick}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           fitView
           snapToGrid
           snapGrid={[10, 10]}
