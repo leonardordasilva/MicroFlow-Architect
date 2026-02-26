@@ -41,9 +41,12 @@ import RecoveryBanner from '@/components/RecoveryBanner';
 import { useAuth } from '@/hooks/useAuth';
 import { saveDiagram } from '@/services/diagramService';
 import { useRealtimeCollab } from '@/hooks/useRealtimeCollab';
-import { Check, Loader2, Share2, Save, LogOut } from 'lucide-react';
+import { Check, Loader2, Share2, Save, LogOut, Keyboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import NodePropertiesPanel from '@/components/NodePropertiesPanel';
+import StatusBar from '@/components/StatusBar';
+import KeyboardShortcutsModal from '@/components/KeyboardShortcutsModal';
 
 const nodeTypes = {
   service: ServiceNode,
@@ -104,6 +107,8 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
   const [diagramId, setDiagramId] = useState<string | undefined>();
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { guides, onNodeDrag, onNodeDragStop } = useSnapGuides(nodes);
   const { broadcastChanges } = useRealtimeCollab(shareToken || null);
@@ -187,11 +192,22 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Delete') storeActions.deleteSelected();
-      if (e.ctrlKey && e.key === 'z') undo();
-      if (e.ctrlKey && e.key === 'y') redo();
+      if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
+      if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
+      if (e.ctrlKey && e.shiftKey && e.key === 'Z') { e.preventDefault(); redo(); }
+      if (e.ctrlKey && e.key === 's') { e.preventDefault(); handleSaveToCloud(); }
+      if (e.key === '?') setShowShortcuts(true);
+      if (e.key === 'Escape') {
+        setSelectedNodeId(null);
+        setContextMenu(null);
+      }
     },
     [storeActions, undo, redo]
   );
+
+  const handleNodeClick = useCallback((_event: React.MouseEvent, node: any) => {
+    setSelectedNodeId(node.id);
+  }, []);
 
   const handleNodeContextMenu = useCallback(
     (event: React.MouseEvent, node: any) => {
@@ -210,6 +226,7 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
 
   const handlePaneClick = useCallback(() => {
     setContextMenu(null);
+    setSelectedNodeId(null);
   }, []);
 
   const handleSaveToCloud = useCallback(async () => {
@@ -286,7 +303,7 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
           <div className="flex items-center gap-1 ml-auto">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSaveToCloud} disabled={saving}>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSaveToCloud} disabled={saving} aria-label="Salvar na nuvem">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 </Button>
               </TooltipTrigger>
@@ -294,7 +311,7 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleShare} disabled={saving}>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleShare} disabled={saving} aria-label="Compartilhar">
                   <Share2 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -302,7 +319,7 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={signOut}>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={signOut} aria-label="Sair">
                   <LogOut className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -310,6 +327,14 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
             </Tooltip>
           </div>
         )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowShortcuts(true)} aria-label="Atalhos de teclado">
+              <Keyboard className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">Atalhos (?)</TooltipContent>
+        </Tooltip>
       </header>
 
       <div className="flex-1 relative" ref={reactFlowWrapper}>
@@ -327,6 +352,7 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
           onNodeDragStop={onNodeDragStop}
           onNodeContextMenu={handleNodeContextMenu}
           onPaneClick={handlePaneClick}
+          onNodeClick={handleNodeClick}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
@@ -374,7 +400,16 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
             </button>
           </div>
         )}
+
+        {selectedNodeId && (
+          <NodePropertiesPanel
+            nodeId={selectedNodeId}
+            onClose={() => setSelectedNodeId(null)}
+          />
+        )}
       </div>
+
+      <StatusBar nodes={nodes} edges={edges} />
 
       <AIGenerateModal
         open={showAIGenerate}
@@ -434,6 +469,11 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
         open={!!shareUrl}
         onOpenChange={(open) => { if (!open) setShareUrl(null); }}
         shareUrl={shareUrl || ''}
+      />
+
+      <KeyboardShortcutsModal
+        open={showShortcuts}
+        onOpenChange={setShowShortcuts}
       />
     </div>
   );
