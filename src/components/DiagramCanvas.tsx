@@ -18,7 +18,7 @@ import {
 } from '@xyflow/react';
 import { useSnapGuides } from '@/hooks/useSnapGuides';
 import SnapGuideLines from '@/components/SnapGuideLines';
-import { toPng } from 'html-to-image';
+import { toPng, toSvg } from 'html-to-image';
 import { toast } from '@/hooks/use-toast';
 import { useDiagramStore } from '@/store/diagramStore';
 
@@ -33,6 +33,8 @@ import AIAnalysisPanel from '@/components/AIAnalysisPanel';
 import ImportJSONModal from '@/components/ImportJSONModal';
 import SpawnFromNodeModal from '@/components/SpawnFromNodeModal';
 import type { DiagramNodeData } from '@/types/diagram';
+import { exportToMermaid } from '@/services/exportService';
+import MermaidExportModal from '@/components/MermaidExportModal';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import RecoveryBanner from '@/components/RecoveryBanner';
 import { Check, Loader2 } from 'lucide-react';
@@ -87,6 +89,7 @@ export default function DiagramCanvas() {
   const [spawnSource, setSpawnSource] = useState<{ id: string; label: string; nodeType: string } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string; nodeLabel: string } | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [mermaidCode, setMermaidCode] = useState<string | null>(null);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { guides, onNodeDrag, onNodeDragStop } = useSnapGuides(nodes);
 
@@ -117,6 +120,26 @@ export default function DiagramCanvas() {
       toast({ title: 'Erro ao exportar PNG', variant: 'destructive' });
     }
   }, [darkMode, diagramName]);
+
+  const handleExportSVG = useCallback(async () => {
+    const el = document.querySelector('.react-flow') as HTMLElement;
+    if (!el) return;
+    try {
+      const dataUrl = await toSvg(el, { backgroundColor: darkMode ? '#0f1520' : '#f5f7fa' });
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `${diagramName || 'diagram'}.svg`;
+      a.click();
+      toast({ title: 'SVG exportado com sucesso!' });
+    } catch {
+      toast({ title: 'Erro ao exportar SVG', variant: 'destructive' });
+    }
+  }, [darkMode, diagramName]);
+
+  const handleExportMermaid = useCallback(() => {
+    const code = exportToMermaid(nodes, edges);
+    setMermaidCode(code);
+  }, [nodes, edges]);
 
   const handleExportJSON = useCallback(() => {
     const json = storeActions.exportJSON();
@@ -184,6 +207,8 @@ export default function DiagramCanvas() {
             }
           }}
           onExportPNG={handleExportPNG}
+          onExportSVG={handleExportSVG}
+          onExportMermaid={handleExportMermaid}
           onExportJSON={handleExportJSON}
           onImportJSON={() => setShowImportJSON(true)}
           onOpenAIGenerate={() => setShowAIGenerate(true)}
@@ -316,6 +341,12 @@ export default function DiagramCanvas() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <MermaidExportModal
+        open={!!mermaidCode}
+        onOpenChange={(open) => { if (!open) setMermaidCode(null); }}
+        code={mermaidCode || ''}
+      />
     </div>
   );
 }
