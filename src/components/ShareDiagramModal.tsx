@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Trash2, UserPlus } from 'lucide-react';
+import { Loader2, Trash2, Search, Check } from 'lucide-react';
 import {
-  findUserByEmail, shareDiagramWithUser, listDiagramShares, revokeShare,
+  searchUsersByEmail, shareDiagramWithUser, listDiagramShares, revokeShare,
   type ShareRecord,
 } from '@/services/shareService';
 
@@ -18,45 +18,77 @@ interface Props {
   ownerId: string;
 }
 
+interface UserResult {
+  id: string;
+  email: string;
+}
+
 export default function ShareDiagramModal({ open, onOpenChange, diagramId, ownerId }: Props) {
-  const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<UserResult[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [searching, setSearching] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [shares, setShares] = useState<ShareRecord[]>([]);
   const [loadingShares, setLoadingShares] = useState(false);
 
+  // Load existing shares
   useEffect(() => {
     if (open && diagramId) {
       setLoadingShares(true);
       listDiagramShares(diagramId).then(setShares).finally(() => setLoadingShares(false));
+      setQuery('');
+      setResults([]);
+      setSelected(new Set());
     }
   }, [open, diagramId]);
 
-  const handleShare = async () => {
-    const trimmed = email.trim().toLowerCase();
-    if (!trimmed) return;
+  // Debounced search
+  useEffect(() => {
+    if (!query.trim()) { setResults([]); return; }
+    const timeout = setTimeout(async () => {
+      setSearching(true);
+      const users = await searchUsersByEmail(query, ownerId);
+      setResults(users);
+      setSearching(false);
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [query, ownerId]);
 
-    setLoading(true);
-    try {
-      const user = await findUserByEmail(trimmed);
-      if (!user) {
-        toast({ title: 'Usuário não encontrado', description: 'Nenhum usuário cadastrado com este e-mail.', variant: 'destructive' });
-        return;
+  const alreadySharedIds = new Set(shares.map((s) => s.shared_with_id));
+
+  const toggleSelect = useCallback((userId: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }, []);
+
+  const handleShareSelected = async () => {
+    if (selected.size === 0) return;
+    setSharing(true);
+    let successCount = 0;
+    let errorCount = 0;
+    for (const userId of selected) {
+      try {
+        await shareDiagramWithUser(diagramId, ownerId, userId);
+        successCount++;
+      } catch {
+        errorCount++;
       }
-      if (user.id === ownerId) {
-        toast({ title: 'Ação inválida', description: 'Você não pode compartilhar consigo mesmo.', variant: 'destructive' });
-        return;
-      }
-      await shareDiagramWithUser(diagramId, ownerId, user.id);
-      toast({ title: 'Diagrama compartilhado!', description: `Acesso concedido para ${trimmed}` });
-      setEmail('');
-      // Refresh shares list
-      const updated = await listDiagramShares(diagramId);
-      setShares(updated);
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
-    } finally {
-      setLoading(false);
     }
+    if (successCount > 0) {
+      toast({ title: `Diagrama compartilhado com ${successCount} usuário(s)!` });
+    }
+    if (errorCount > 0) {
+      toast({ title: `${errorCount} erro(s) ao compartilhar`, variant: 'destructive' });
+    }
+    setSelected(new Set());
+    const updated = await listDiagramShares(diagramId);
+    setShares(updated);
+    setSharing(false);
   };
 
   const handleRevoke = async (share: ShareRecord) => {
@@ -71,57 +103,100 @@ export default function ShareDiagramModal({ open, onOpenChange, diagramId, owner
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-[520px] max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-base">Compartilhar Diagrama</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Adicione usuários por e-mail para dar permissão de edição.
-          </p>
-
-          <div className="flex gap-2">
+        <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="email@exemplo.com"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleShare()}
-              disabled={loading}
+              placeholder="Buscar usuários por e-mail..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-9"
             />
-            <Button onClick={handleShare} disabled={loading || !email.trim()} size="sm">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-            </Button>
           </div>
 
-          {loadingShares ? (
-            <div className="flex justify-center py-4">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : shares.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Usuários com acesso:</p>
-              {shares.map((s) => (
-                <div key={s.id} className="flex items-center justify-between rounded-md border px-3 py-2">
-                  <span className="text-sm truncate">{s.shared_with_email}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-destructive hover:text-destructive"
-                    onClick={() => handleRevoke(s)}
-                    aria-label="Revogar acesso"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+          {/* Search results */}
+          {(query.trim() || searching) && (
+            <div className="border rounded-md max-h-48 overflow-y-auto">
+              {searching ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 </div>
-              ))}
+              ) : results.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">
+                  Nenhum usuário encontrado
+                </p>
+              ) : (
+                results.map((user) => {
+                  const alreadyShared = alreadySharedIds.has(user.id);
+                  const isSelected = selected.has(user.id);
+                  return (
+                    <button
+                      key={user.id}
+                      type="button"
+                      disabled={alreadyShared}
+                      onClick={() => toggleSelect(user.id)}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 text-sm transition-colors hover:bg-accent/50 border-b last:border-b-0 ${
+                        isSelected ? 'bg-accent' : ''
+                      } ${alreadyShared ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <span className="truncate">{user.email}</span>
+                      {alreadyShared ? (
+                        <span className="text-xs text-muted-foreground shrink-0 ml-2">Já tem acesso</span>
+                      ) : isSelected ? (
+                        <Check className="h-4 w-4 text-primary shrink-0 ml-2" />
+                      ) : null}
+                    </button>
+                  );
+                })
+              )}
             </div>
-          ) : (
-            <p className="text-xs text-muted-foreground text-center py-2">
-              Nenhum usuário com acesso compartilhado.
-            </p>
           )}
+
+          {/* Selected count + share button */}
+          {selected.size > 0 && (
+            <Button onClick={handleShareSelected} disabled={sharing} className="w-full">
+              {sharing ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Compartilhar com {selected.size} usuário(s)
+            </Button>
+          )}
+
+          {/* Existing shares */}
+          <div className="flex-1 overflow-y-auto">
+            {loadingShares ? (
+              <div className="flex justify-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : shares.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Usuários com acesso:</p>
+                {shares.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between rounded-md border px-3 py-2">
+                    <span className="text-sm truncate">{s.shared_with_email}</span>
+                    <Button
+                      variant="ghost" size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
+                      onClick={() => handleRevoke(s)}
+                      aria-label="Revogar acesso"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-2">
+                Nenhum usuário com acesso compartilhado.
+              </p>
+            )}
+          </div>
         </div>
 
         <DialogFooter>

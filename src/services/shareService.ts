@@ -9,6 +9,23 @@ export interface ShareRecord {
   shared_with_email?: string;
 }
 
+/** Search users by email (partial match), excluding a specific user */
+export async function searchUsersByEmail(
+  query: string,
+  excludeUserId: string,
+): Promise<{ id: string; email: string }[]> {
+  const trimmed = query.trim().toLowerCase();
+  if (!trimmed) return [];
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, email')
+    .ilike('email', `%${trimmed}%`)
+    .neq('id', excludeUserId)
+    .limit(20);
+  if (error || !data) return [];
+  return data;
+}
+
 /** Look up a user by email */
 export async function findUserByEmail(email: string): Promise<{ id: string; email: string } | null> {
   const { data, error } = await supabase
