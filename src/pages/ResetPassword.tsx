@@ -12,15 +12,34 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    // Listen for the PASSWORD_RECOVERY event from the URL hash
+    // Check URL hash for recovery token (Supabase appends #access_token=...&type=recovery)
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      setReady(true);
+      return;
+    }
+
+    // Also listen for the PASSWORD_RECOVERY auth event
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
         setReady(true);
       }
     });
-    return () => subscription.unsubscribe();
+
+    // If no hash and no event after 3s, show error
+    const timeout = setTimeout(() => {
+      if (!ready) {
+        setError('Link de recuperação inválido ou expirado. Solicite um novo link na tela de login.');
+      }
+    }, 3000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,7 +59,12 @@ export default function ResetPasswordPage() {
       toast({ title: 'Senha atualizada com sucesso!' });
       navigate('/');
     } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+      const msgMap: Record<string, string> = {
+        'New password should be different from the old password.': 'A nova senha deve ser diferente da senha atual.',
+        'Auth session missing!': 'Sessão expirada. Solicite um novo link de recuperação.',
+      };
+      const translated = msgMap[err.message] || err.message;
+      toast({ title: 'Erro', description: translated, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -54,7 +78,14 @@ export default function ResetPasswordPage() {
           <p className="text-sm text-muted-foreground">Defina sua nova senha</p>
         </div>
 
-        {!ready ? (
+        {error ? (
+          <div className="text-center space-y-4">
+            <p className="text-sm text-destructive">{error}</p>
+            <Button variant="outline" onClick={() => navigate('/')}>
+              Voltar ao login
+            </Button>
+          </div>
+        ) : !ready ? (
           <p className="text-center text-sm text-muted-foreground">
             Verificando link de recuperação...
           </p>
