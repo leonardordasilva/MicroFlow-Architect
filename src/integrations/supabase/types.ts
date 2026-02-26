@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      diagram_shares: {
+        Row: {
+          created_at: string
+          diagram_id: string
+          id: string
+          owner_id: string
+          shared_with_id: string
+        }
+        Insert: {
+          created_at?: string
+          diagram_id: string
+          id?: string
+          owner_id: string
+          shared_with_id: string
+        }
+        Update: {
+          created_at?: string
+          diagram_id?: string
+          id?: string
+          owner_id?: string
+          shared_with_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diagram_shares_diagram_id_fkey"
+            columns: ["diagram_id"]
+            isOneToOne: false
+            referencedRelation: "diagrams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       diagrams: {
         Row: {
           created_at: string
@@ -47,6 +79,24 @@ export type Database = {
           share_token?: string | null
           title?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
         }
         Relationships: []
       }
