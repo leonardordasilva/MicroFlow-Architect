@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -6,25 +6,21 @@ import {
   loadUserDiagrams,
   deleteDiagram,
   renameDiagram,
-  shareDiagram,
   type DiagramRecord,
 } from '@/services/diagramService';
+import { loadSharedWithMe } from '@/services/shareService';
 import { useDiagramStore } from '@/store/diagramStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Trash2, Pencil, ArrowLeft, FileText, Share2, RefreshCw, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Pencil, ArrowLeft, FileText, Share2, RefreshCw, Loader2, Users } from 'lucide-react';
 import { format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+import ShareDiagramModal from '@/components/ShareDiagramModal';
 
 function DiagramCardSkeleton() {
   return (
@@ -45,14 +41,14 @@ export default function MyDiagrams() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [shareTarget, setShareTarget] = useState<{ diagramId: string; ownerId: string } | null>(null);
+  const [sharedWithMe, setSharedWithMe] = useState<
+    { diagram_id: string; title: string; owner_email: string; updated_at: string; nodes: any[]; edges: any[] }[]
+  >([]);
+  const [loadingShared, setLoadingShared] = useState(false);
 
   const {
-    data,
-    isLoading,
-    isError,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
+    data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage,
   } = useInfiniteQuery({
     queryKey: ['diagrams', user?.id],
     queryFn: ({ pageParam = 0 }) => loadUserDiagrams(user!.id, pageParam),
@@ -64,6 +60,13 @@ export default function MyDiagrams() {
   });
 
   const diagrams = data?.pages.flatMap((p) => p.diagrams) ?? [];
+
+  // Load shared diagrams
+  useEffect(() => {
+    if (!user) return;
+    setLoadingShared(true);
+    loadSharedWithMe(user.id).then(setSharedWithMe).finally(() => setLoadingShared(false));
+  }, [user]);
 
   const deleteMutation = useMutation({
     mutationFn: deleteDiagram,
@@ -107,19 +110,16 @@ export default function MyDiagrams() {
     const store = useDiagramStore.getState();
     store.loadDiagram(diagram.nodes, diagram.edges);
     store.setDiagramName(diagram.title);
+    store.setCurrentDiagramId(diagram.id);
     navigate('/');
   };
 
-  const handleShare = async (e: React.MouseEvent, d: DiagramRecord) => {
-    e.stopPropagation();
-    if (!user) return;
-    const url = await shareDiagram(d.id, user.id);
-    if (url) {
-      await navigator.clipboard.writeText(url);
-      toast({ title: 'Link copiado!', description: url });
-    } else {
-      toast({ title: 'Erro ao compartilhar', variant: 'destructive' });
-    }
+  const handleLoadShared = (item: typeof sharedWithMe[0]) => {
+    const store = useDiagramStore.getState();
+    store.loadDiagram(item.nodes, item.edges);
+    store.setDiagramName(item.title);
+    store.setCurrentDiagramId(item.diagram_id);
+    navigate('/');
   };
 
   return (
@@ -140,10 +140,7 @@ export default function MyDiagrams() {
         {isError && (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <p className="mb-4">Erro ao carregar diagramas.</p>
-            <Button
-              variant="outline"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ['diagrams', user?.id] })}
-            >
+            <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ['diagrams', user?.id] })}>
               <RefreshCw className="mr-2 h-4 w-4" /> Tentar novamente
             </Button>
           </div>
@@ -151,11 +148,9 @@ export default function MyDiagrams() {
 
         {isLoading ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <DiagramCardSkeleton key={i} />
-            ))}
+            {Array.from({ length: 6 }).map((_, i) => <DiagramCardSkeleton key={i} />)}
           </div>
-        ) : !isError && diagrams.length === 0 ? (
+        ) : !isError && diagrams.length === 0 && sharedWithMe.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <FileText className="mb-4 h-14 w-14 opacity-30" />
             <p className="mb-1">Nenhum diagrama salvo ainda</p>
@@ -166,91 +161,115 @@ export default function MyDiagrams() {
           </div>
         ) : !isError ? (
           <>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {diagrams.map((d) => (
-                <div
-                  key={d.id}
-                  className="group relative flex cursor-pointer flex-col rounded-xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
-                  onClick={() => handleLoad(d)}
-                >
-                  <div className="mb-2 flex items-center justify-between">
-                    {editingId === d.id ? (
-                      <Input
-                        autoFocus
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleRename(d.id);
-                          if (e.key === 'Escape') setEditingId(null);
+            {/* My own diagrams */}
+            {diagrams.length > 0 && (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {diagrams.map((d) => (
+                  <div
+                    key={d.id}
+                    className="group relative flex cursor-pointer flex-col rounded-xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+                    onClick={() => handleLoad(d)}
+                  >
+                    <div className="mb-2 flex items-center justify-between">
+                      {editingId === d.id ? (
+                        <Input
+                          autoFocus
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleRename(d.id);
+                            if (e.key === 'Escape') setEditingId(null);
+                          }}
+                          onBlur={() => handleRename(d.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-7 text-sm"
+                        />
+                      ) : (
+                        <h3 className="truncate font-semibold text-foreground">{d.title}</h3>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {d.nodes.length} nós · {d.edges.length} conexões
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Atualizado em {format(new Date(d.updated_at), 'dd/MM/yyyy HH:mm')}
+                    </p>
+                    <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <Button
+                        variant="ghost" size="icon" className="h-7 w-7"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShareTarget({ diagramId: d.id, ownerId: d.owner_id });
                         }}
-                        onBlur={() => handleRename(d.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="h-7 text-sm"
-                      />
-                    ) : (
-                      <h3 className="truncate font-semibold text-foreground">{d.title}</h3>
-                    )}
+                        aria-label="Compartilhar"
+                      >
+                        <Share2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost" size="icon" className="h-7 w-7"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingId(d.id);
+                          setEditTitle(d.title);
+                        }}
+                        aria-label="Renomear"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost" size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={(e) => { e.stopPropagation(); setDeleteId(d.id); }}
+                        aria-label="Excluir"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {d.nodes.length} nós · {d.edges.length} conexões
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Atualizado em {format(new Date(d.updated_at), 'dd/MM/yyyy HH:mm')}
-                  </p>
-                  <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={(e) => handleShare(e, d)}
-                      aria-label="Compartilhar"
-                    >
-                      <Share2 className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingId(d.id);
-                        setEditTitle(d.title);
-                      }}
-                      aria-label="Renomear"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive hover:text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteId(d.id);
-                      }}
-                      aria-label="Excluir"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
             {hasNextPage && (
               <div className="mt-6 flex justify-center">
-                <Button
-                  variant="outline"
-                  onClick={() => fetchNextPage()}
-                  disabled={isFetchingNextPage}
-                >
-                {isFetchingNextPage ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Carregando...
-                    </>
+                <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+                  {isFetchingNextPage ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Carregando...</>
                   ) : 'Carregar mais'}
                 </Button>
+              </div>
+            )}
+
+            {/* Shared with me */}
+            {(loadingShared || sharedWithMe.length > 0) && (
+              <div className="mt-10">
+                <div className="mb-4 flex items-center gap-2">
+                  <Users className="h-5 w-5 text-muted-foreground" />
+                  <h2 className="text-lg font-semibold text-foreground">Compartilhados comigo</h2>
+                </div>
+                {loadingShared ? (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {Array.from({ length: 3 }).map((_, i) => <DiagramCardSkeleton key={i} />)}
+                  </div>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {sharedWithMe.map((item) => (
+                      <div
+                        key={item.diagram_id}
+                        className="group relative flex cursor-pointer flex-col rounded-xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+                        onClick={() => handleLoadShared(item)}
+                      >
+                        <h3 className="truncate font-semibold text-foreground mb-2">{item.title}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          Atualizado em {format(new Date(item.updated_at), 'dd/MM/yyyy HH:mm')}
+                        </p>
+                        <Badge variant="secondary" className="mt-2 w-fit text-xs">
+                          Compartilhado por {item.owner_email}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -261,9 +280,7 @@ export default function MyDiagrams() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir diagrama</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza? Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
+            <AlertDialogDescription>Tem certeza? Esta ação não pode ser desfeita.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -271,6 +288,15 @@ export default function MyDiagrams() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {shareTarget && (
+        <ShareDiagramModal
+          open={!!shareTarget}
+          onOpenChange={(open) => { if (!open) setShareTarget(null); }}
+          diagramId={shareTarget.diagramId}
+          ownerId={shareTarget.ownerId}
+        />
+      )}
     </div>
   );
 }
