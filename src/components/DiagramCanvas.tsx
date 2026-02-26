@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,9 +35,15 @@ import SpawnFromNodeModal from '@/components/SpawnFromNodeModal';
 import type { DiagramNodeData } from '@/types/diagram';
 import { exportToMermaid } from '@/services/exportService';
 import MermaidExportModal from '@/components/MermaidExportModal';
+import ShareModal from '@/components/ShareModal';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import RecoveryBanner from '@/components/RecoveryBanner';
-import { Check, Loader2 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { saveDiagram } from '@/services/diagramService';
+import { useRealtimeCollab } from '@/hooks/useRealtimeCollab';
+import { Check, Loader2, Share2, Save, LogOut } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const nodeTypes = {
   service: ServiceNode,
@@ -53,7 +59,11 @@ const edgeTypes = {
 // Get stable references to temporal actions (no reactive subscription)
 const getTemporalActions = () => useDiagramStore.temporal.getState();
 
-export default function DiagramCanvas() {
+interface DiagramCanvasProps {
+  shareToken?: string;
+}
+
+export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
   const nodes = useDiagramStore((s) => s.nodes);
   const edges = useDiagramStore((s) => s.edges);
   const diagramName = useDiagramStore((s) => s.diagramName);
@@ -82,6 +92,7 @@ export default function DiagramCanvas() {
   const redo = useCallback(() => getTemporalActions().redo(), []);
 
   const { saveStatus } = useAutoSave();
+  const { user, signOut } = useAuth();
   const [darkMode, setDarkMode] = useState(true);
   const [showAIGenerate, setShowAIGenerate] = useState(false);
   const [showAIAnalysis, setShowAIAnalysis] = useState(false);
@@ -90,8 +101,19 @@ export default function DiagramCanvas() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string; nodeLabel: string } | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [mermaidCode, setMermaidCode] = useState<string | null>(null);
+  const [diagramId, setDiagramId] = useState<string | undefined>();
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { guides, onNodeDrag, onNodeDragStop } = useSnapGuides(nodes);
+  const { broadcastChanges } = useRealtimeCollab(shareToken || null);
+
+  // Broadcast changes when nodes/edges update (only if in shared mode)
+  useEffect(() => {
+    if (shareToken) {
+      broadcastChanges(nodes, edges);
+    }
+  }, [nodes, edges, shareToken, broadcastChanges]);
 
   const toggleDarkMode = useCallback(() => {
     setDarkMode((prev) => {
@@ -190,6 +212,36 @@ export default function DiagramCanvas() {
     setContextMenu(null);
   }, []);
 
+  const handleSaveToCloud = useCallback(async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      const record = await saveDiagram(diagramName, nodes, edges, user.id, diagramId);
+      setDiagramId(record.id);
+      toast({ title: 'Diagrama salvo na nuvem!' });
+    } catch (err: any) {
+      toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }, [user, diagramName, nodes, edges, diagramId]);
+
+  const handleShare = useCallback(async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      const record = await saveDiagram(diagramName, nodes, edges, user.id, diagramId);
+      setDiagramId(record.id);
+      if (record.share_token) {
+        setShareUrl(`${window.location.origin}/diagram/${record.share_token}`);
+      }
+    } catch (err: any) {
+      toast({ title: 'Erro ao compartilhar', description: err.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }, [user, diagramName, nodes, edges, diagramId]);
+
   return (
     <div className="flex h-screen w-screen flex-col bg-background" onKeyDown={handleKeyDown} tabIndex={0}>
       <header className="flex items-center justify-center gap-3 border-b bg-card/80 px-4 py-2 backdrop-blur-sm">
@@ -218,15 +270,45 @@ export default function DiagramCanvas() {
           darkMode={darkMode}
           onToggleDarkMode={toggleDarkMode}
         />
-        {saveStatus === 'saving' && (
-          <span className="flex items-center gap-1 text-xs text-muted-foreground animate-pulse">
-            <Loader2 className="h-3 w-3 animate-spin" /> Salvando...
-          </span>
-        )}
-        {saveStatus === 'saved' && (
-          <span className="flex items-center gap-1 text-xs text-green-400">
-            <Check className="h-3 w-3" /> Salvo
-          </span>
+        <div className="flex items-center gap-1">
+          {saveStatus === 'saving' && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground animate-pulse">
+              <Loader2 className="h-3 w-3 animate-spin" /> Salvando...
+            </span>
+          )}
+          {saveStatus === 'saved' && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Check className="h-3 w-3" /> Salvo
+            </span>
+          )}
+        </div>
+        {user && (
+          <div className="flex items-center gap-1 ml-auto">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSaveToCloud} disabled={saving}>
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Salvar na nuvem</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleShare} disabled={saving}>
+                  <Share2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Compartilhar</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={signOut}>
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Sair</TooltipContent>
+            </Tooltip>
+          </div>
         )}
       </header>
 
@@ -346,6 +428,12 @@ export default function DiagramCanvas() {
         open={!!mermaidCode}
         onOpenChange={(open) => { if (!open) setMermaidCode(null); }}
         code={mermaidCode || ''}
+      />
+
+      <ShareModal
+        open={!!shareUrl}
+        onOpenChange={(open) => { if (!open) setShareUrl(null); }}
+        shareUrl={shareUrl || ''}
       />
     </div>
   );
