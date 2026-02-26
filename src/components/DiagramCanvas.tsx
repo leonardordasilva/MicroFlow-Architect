@@ -37,13 +37,11 @@ import type { DiagramNodeData, EdgeProtocol, NodeType } from '@/types/diagram';
 import { exportToMermaid } from '@/services/exportService';
 import MermaidExportModal from '@/components/MermaidExportModal';
 
-import { useAutoSave } from '@/hooks/useAutoSave';
-import RecoveryBanner from '@/components/RecoveryBanner';
 import { useAuth } from '@/hooks/useAuth';
 import { saveDiagram } from '@/services/diagramService';
 import { useRealtimeCollab } from '@/hooks/useRealtimeCollab';
 import { inferProtocol } from '@/utils/protocolInference';
-import { Check, Loader2, Save, LogOut, Keyboard, FolderOpen } from 'lucide-react';
+import { Loader2, Save, LogOut, Keyboard, FolderOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -104,7 +102,7 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
   const undo = useCallback(() => getTemporalActions().undo(), []);
   const redo = useCallback(() => getTemporalActions().redo(), []);
 
-  const { saveStatus } = useAutoSave();
+  
   const { user, signOut } = useAuth();
   const [darkMode, setDarkMode] = useState(false);
   const [showAIGenerate, setShowAIGenerate] = useState(false);
@@ -353,18 +351,6 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
           darkMode={darkMode}
           onToggleDarkMode={toggleDarkMode}
         />
-        <div className="flex items-center gap-1">
-          {saveStatus === 'saving' && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground animate-pulse">
-              <Loader2 className="h-3 w-3 animate-spin" /> Salvando...
-            </span>
-          )}
-          {saveStatus === 'saved' && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Check className="h-3 w-3" /> Salvo
-            </span>
-          )}
-        </div>
 
         {/* Épico 7: shared context badges */}
         {shareToken && !diagramId && (
@@ -418,7 +404,7 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
       </header>
 
       <div className="flex-1 relative" ref={reactFlowWrapper}>
-        <RecoveryBanner />
+        
         <ReactFlow
           nodes={nodes}
           edges={edges}
