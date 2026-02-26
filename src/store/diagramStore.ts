@@ -124,8 +124,8 @@ export const useDiagramStore = create<DiagramStore>()(
         const labelMap: Record<NodeType, string> = {
           service: 'Microserviço',
           database: subType || 'Oracle',
-          queue: 'MQ',
-          external: 'REST',
+          queue: subType || 'MQ',
+          external: subType || 'REST',
         };
         const newNode: DiagramNode = {
           id: createNodeId(),
@@ -176,8 +176,8 @@ export const useDiagramStore = create<DiagramStore>()(
         const labelMap: Record<NodeType, string> = {
           service: 'Microserviço',
           database: subType || 'Oracle',
-          queue: 'MQ',
-          external: 'REST',
+          queue: subType || 'MQ',
+          external: subType || 'REST',
         };
 
         const newNodes: DiagramNode[] = [];

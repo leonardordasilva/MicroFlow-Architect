@@ -92,8 +92,44 @@ export default function Toolbar({
 
       <ToolbarButton icon={Box} label="Microserviço" onClick={() => onAddNode('service')} />
       <DatabaseDropdown onSelect={(subType) => onAddNode('database', subType)} />
-      <ToolbarButton icon={Mail} label="MQ" onClick={() => onAddNode('queue')} />
-      <ToolbarButton icon={Globe} label="REST" onClick={() => onAddNode('external')} />
+      <DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9">
+                <Mail className="h-4 w-4" />
+                <ChevronDown className="h-3 w-3 ml-[-2px]" />
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">Fila / Mensageria</TooltipContent>
+        </Tooltip>
+        <DropdownMenuContent align="start" className="z-50">
+          <DropdownMenuItem onClick={() => onAddNode('queue', 'MQ')}>MQ</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAddNode('queue', 'Kafka')}>Kafka</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAddNode('queue', 'AMQP')}>AMQP</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9">
+                <Globe className="h-4 w-4" />
+                <ChevronDown className="h-3 w-3 ml-[-2px]" />
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">API / Protocolo</TooltipContent>
+        </Tooltip>
+        <DropdownMenuContent align="start" className="z-50">
+          <DropdownMenuItem onClick={() => onAddNode('external', 'REST')}>REST</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAddNode('external', 'gRPC')}>gRPC</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAddNode('external', 'GraphQL')}>GraphQL</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAddNode('external', 'WebSocket')}>WebSocket</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAddNode('external', 'HTTPS')}>HTTPS</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <Separator orientation="vertical" className="h-6" />
 

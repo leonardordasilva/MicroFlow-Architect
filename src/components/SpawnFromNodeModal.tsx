@@ -37,6 +37,14 @@ export default function SpawnFromNodeModal({
   const isService = sourceNodeType === 'service';
   const [type, setType] = useState<NodeType>('database');
   const [subType, setSubType] = useState('Oracle');
+
+  // Update default subType when type changes
+  const handleTypeChange = (v: string) => {
+    setType(v as NodeType);
+    if (v === 'database') setSubType('Oracle');
+    else if (v === 'queue') setSubType('MQ');
+    else if (v === 'external') setSubType('REST');
+  };
   const [count, setCount] = useState(1);
 
   // Reset state when modal opens
@@ -52,7 +60,8 @@ export default function SpawnFromNodeModal({
 
   const handleConfirm = () => {
     if (count < 1) return;
-    onConfirm(effectiveType, count, effectiveType === 'database' ? subType : undefined);
+    const needsSubType = effectiveType === 'database' || effectiveType === 'queue' || effectiveType === 'external';
+    onConfirm(effectiveType, count, needsSubType ? subType : undefined);
     onOpenChange(false);
     setCount(1);
   };
@@ -78,15 +87,15 @@ export default function SpawnFromNodeModal({
           ) : (
             <div className="space-y-2">
               <Label>Tipo do objeto</Label>
-              <Select value={type} onValueChange={(v) => setType(v as NodeType)}>
+              <Select value={type} onValueChange={handleTypeChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="z-50">
                   <SelectItem value="service">Microserviço</SelectItem>
                   <SelectItem value="database">Banco de Dados</SelectItem>
-                  <SelectItem value="queue">MQ</SelectItem>
-                  <SelectItem value="external">REST</SelectItem>
+                  <SelectItem value="queue">Fila (MQ/Kafka/AMQP)</SelectItem>
+                  <SelectItem value="external">API (REST/gRPC/GraphQL/WS/HTTPS)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -102,6 +111,40 @@ export default function SpawnFromNodeModal({
                 <SelectContent className="z-50">
                   <SelectItem value="Oracle">Oracle</SelectItem>
                   <SelectItem value="Redis">Redis</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {type === 'queue' && (
+            <div className="space-y-2">
+              <Label>Subtipo</Label>
+              <Select value={subType} onValueChange={setSubType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-50">
+                  <SelectItem value="MQ">MQ</SelectItem>
+                  <SelectItem value="Kafka">Kafka</SelectItem>
+                  <SelectItem value="AMQP">AMQP</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {type === 'external' && (
+            <div className="space-y-2">
+              <Label>Subtipo</Label>
+              <Select value={subType} onValueChange={setSubType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-50">
+                  <SelectItem value="REST">REST</SelectItem>
+                  <SelectItem value="gRPC">gRPC</SelectItem>
+                  <SelectItem value="GraphQL">GraphQL</SelectItem>
+                  <SelectItem value="WebSocket">WebSocket</SelectItem>
+                  <SelectItem value="HTTPS">HTTPS</SelectItem>
                 </SelectContent>
               </Select>
             </div>
