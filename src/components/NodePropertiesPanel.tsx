@@ -1,0 +1,170 @@
+import { useState, useEffect } from 'react';
+import { X, Plus, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { useDiagramStore } from '@/store/diagramStore';
+import type { DiagramNode, DiagramNodeData } from '@/types/diagram';
+
+interface NodePropertiesPanelProps {
+  nodeId: string | null;
+  onClose: () => void;
+}
+
+export default function NodePropertiesPanel({ nodeId, onClose }: NodePropertiesPanelProps) {
+  const nodes = useDiagramStore((s) => s.nodes);
+  const setNodes = useDiagramStore((s) => s.setNodes);
+
+  const node = nodes.find((n) => n.id === nodeId);
+  const data = node?.data as unknown as DiagramNodeData | undefined;
+
+  const [label, setLabel] = useState('');
+  const [internalDbs, setInternalDbs] = useState<string[]>([]);
+  const [internalSvcs, setInternalSvcs] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (data) {
+      setLabel(data.label);
+      setInternalDbs(data.internalDatabases || []);
+      setInternalSvcs(data.internalServices || []);
+    }
+  }, [nodeId, data?.label]);
+
+  if (!node || !data) return null;
+
+  const updateNode = (updates: Partial<DiagramNodeData>) => {
+    setNodes(
+      nodes.map((n) =>
+        n.id === nodeId ? { ...n, data: { ...n.data, ...updates } } : n,
+      ),
+    );
+  };
+
+  const handleLabelChange = (value: string) => {
+    setLabel(value);
+    updateNode({ label: value });
+  };
+
+  const handleDbChange = (index: number, value: string) => {
+    const updated = [...internalDbs];
+    updated[index] = value;
+    setInternalDbs(updated);
+    updateNode({ internalDatabases: updated });
+  };
+
+  const addDb = () => {
+    const updated = [...internalDbs, `Oracle ${internalDbs.length + 1}`];
+    setInternalDbs(updated);
+    updateNode({ internalDatabases: updated });
+  };
+
+  const removeDb = (index: number) => {
+    const updated = internalDbs.filter((_, i) => i !== index);
+    setInternalDbs(updated);
+    updateNode({ internalDatabases: updated });
+  };
+
+  const handleSvcChange = (index: number, value: string) => {
+    const updated = [...internalSvcs];
+    updated[index] = value;
+    setInternalSvcs(updated);
+    updateNode({ internalServices: updated });
+  };
+
+  const addSvc = () => {
+    const updated = [...internalSvcs, `Microserviço ${internalSvcs.length + 1}`];
+    setInternalSvcs(updated);
+    updateNode({ internalServices: updated });
+  };
+
+  const removeSvc = (index: number) => {
+    const updated = internalSvcs.filter((_, i) => i !== index);
+    setInternalSvcs(updated);
+    updateNode({ internalServices: updated });
+  };
+
+  const typeLabels: Record<string, string> = {
+    service: 'Microserviço',
+    database: 'Banco de Dados',
+    queue: 'Fila',
+    external: 'API Externa',
+  };
+
+  return (
+    <div className="absolute right-0 top-0 bottom-0 w-80 bg-card border-l border-border shadow-xl z-40 flex flex-col animate-in slide-in-from-right-5 duration-200">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <h3 className="text-sm font-semibold text-foreground">Propriedades</h3>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} aria-label="Fechar painel">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Tipo</Label>
+          <div className="rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground">
+            {typeLabels[node.type || ''] || node.type}
+            {data.subType ? ` (${data.subType})` : ''}
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Nome</Label>
+          <Input
+            value={label}
+            onChange={(e) => handleLabelChange(e.target.value)}
+            className="h-9 text-sm"
+          />
+        </div>
+
+        {node.type === 'service' && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Bancos Internos</Label>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={addDb} aria-label="Adicionar banco">
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              {internalDbs.map((db, i) => (
+                <div key={i} className="flex items-center gap-1">
+                  <Input
+                    value={db}
+                    onChange={(e) => handleDbChange(i, e.target.value)}
+                    className="h-8 text-xs flex-1"
+                  />
+                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => removeDb(i)} aria-label="Remover banco">
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Serviços Internos</Label>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={addSvc} aria-label="Adicionar serviço">
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              {internalSvcs.map((svc, i) => (
+                <div key={i} className="flex items-center gap-1">
+                  <Input
+                    value={svc}
+                    onChange={(e) => handleSvcChange(i, e.target.value)}
+                    className="h-8 text-xs flex-1"
+                  />
+                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => removeSvc(i)} aria-label="Remover serviço">
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
