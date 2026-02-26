@@ -15,13 +15,13 @@ import {
   Controls,
   MiniMap,
   BackgroundVariant,
-  type ReactFlowInstance,
 } from '@xyflow/react';
 import { useSnapGuides } from '@/hooks/useSnapGuides';
 import SnapGuideLines from '@/components/SnapGuideLines';
 import { toPng } from 'html-to-image';
 import { toast } from '@/hooks/use-toast';
-import { useDiagram } from '@/hooks/useDiagram';
+import { useDiagramStore } from '@/store/diagramStore';
+import { useStore } from 'zustand';
 
 import ServiceNode from '@/components/nodes/ServiceNode';
 import DatabaseNode from '@/components/nodes/DatabaseNode';
@@ -33,7 +33,7 @@ import AIGenerateModal from '@/components/AIGenerateModal';
 import AIAnalysisPanel from '@/components/AIAnalysisPanel';
 import ImportJSONModal from '@/components/ImportJSONModal';
 import SpawnFromNodeModal from '@/components/SpawnFromNodeModal';
-import type { NodeType, DiagramNodeData } from '@/types/diagram';
+import type { DiagramNodeData } from '@/types/diagram';
 
 const nodeTypes = {
   service: ServiceNode,
@@ -50,9 +50,11 @@ export default function DiagramCanvas() {
   const {
     nodes, edges, diagramName, setDiagramName,
     onNodesChange, onEdgesChange, onConnect, onNodeDragHandler,
-    addNode, addNodesFromSource, deleteSelected, undo, redo, autoLayout,
-    clearCanvas, loadDiagram, exportJSON, setNodes, setEdges,
-  } = useDiagram();
+    addNode, addNodesFromSource, deleteSelected, autoLayout,
+    clearCanvas, loadDiagram, exportJSON,
+  } = useDiagramStore();
+
+  const { undo, redo } = useStore(useDiagramStore.temporal, (state) => ({ undo: state.undo, redo: state.redo }));
 
   const [darkMode, setDarkMode] = useState(true);
   const [showAIGenerate, setShowAIGenerate] = useState(false);
@@ -125,7 +127,6 @@ export default function DiagramCanvas() {
   const handleNodeContextMenu = useCallback(
     (event: React.MouseEvent, node: any) => {
       event.preventDefault();
-      // Database and external nodes cannot spawn other nodes
       if (node.type === 'database' || node.type === 'external') return;
       const nodeData = node.data as DiagramNodeData;
       setContextMenu({
@@ -183,7 +184,7 @@ export default function DiagramCanvas() {
           fitView
           snapToGrid
           snapGrid={[10, 10]}
-        defaultEdgeOptions={{
+          defaultEdgeOptions={{
             type: 'editable',
             animated: true,
             style: { strokeWidth: 2 },
@@ -208,7 +209,6 @@ export default function DiagramCanvas() {
           />
         </ReactFlow>
 
-        {/* Context Menu */}
         {contextMenu && (
           <div
             className="fixed z-50 rounded-md border bg-popover p-1 shadow-md min-w-[180px]"
