@@ -1,6 +1,6 @@
 import { memo, useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Box, Database } from 'lucide-react';
+import { Box, Database, Server } from 'lucide-react';
 import type { DiagramNodeData } from '@/types/diagram';
 
 function EditableDbItem({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -42,6 +42,12 @@ const ServiceNode = memo(({ data, id, selected }: NodeProps) => {
   const handleDbRename = (index: number, newName: string) => {
     if (nodeData.internalDatabases) {
       nodeData.internalDatabases[index] = newName;
+    }
+  };
+
+  const handleSvcRename = (index: number, newName: string) => {
+    if (nodeData.internalServices) {
+      nodeData.internalServices[index] = newName;
     }
   };
 
@@ -93,6 +99,17 @@ const ServiceNode = memo(({ data, id, selected }: NodeProps) => {
             <div key={i} className="flex items-center gap-1 text-xs text-muted-foreground">
               <Database className="h-3 w-3 text-[hsl(var(--node-database))]" />
               <EditableDbItem value={db} onChange={(v) => handleDbRename(i, v)} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {nodeData.internalServices && nodeData.internalServices.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {nodeData.internalServices.map((svc, i) => (
+            <div key={i} className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Server className="h-3 w-3 text-[hsl(var(--node-service))]" />
+              <EditableDbItem value={svc} onChange={(v) => handleSvcRename(i, v)} />
             </div>
           ))}
         </div>

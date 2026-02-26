@@ -185,6 +185,23 @@ export function useDiagram() {
         return;
       }
 
+      // If adding a microservice from a service node, embed it inside the service
+      if (type === 'service' && sourceNode.type === 'service') {
+        const currentSvcs = sourceData.internalServices || [];
+        const newSvcs = [...currentSvcs];
+        for (let i = 0; i < count; i++) {
+          newSvcs.push(`Microserviço ${currentSvcs.length + i + 1}`);
+        }
+        setNodes((prev) =>
+          prev.map((n) =>
+            n.id === sourceNodeId
+              ? { ...n, data: { ...n.data, internalServices: newSvcs } }
+              : n
+          )
+        );
+        return;
+      }
+
       const labelMap: Record<NodeType, string> = {
         service: 'Microserviço',
         database: subType || 'Oracle',
