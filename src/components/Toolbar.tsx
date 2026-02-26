@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import {
   Box, Database, Mail, Globe, Trash2, Undo2, Redo2, LayoutGrid,
   Download, Upload, Image, Sparkles, Brain, Moon, Sun, ChevronDown, XCircle,
+  FileCode, FileImage, FileJson,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -17,6 +18,8 @@ interface ToolbarProps {
   onRedo: () => void;
   onAutoLayout: (engine: string, direction: string) => void;
   onExportPNG: () => void;
+  onExportSVG: () => void;
+  onExportMermaid: () => void;
   onExportJSON: () => void;
   onImportJSON: () => void;
   onOpenAIGenerate: () => void;
@@ -74,7 +77,7 @@ function DatabaseDropdown({ onSelect }: { onSelect: (subType: string) => void })
 
 export default function Toolbar({
   onAddNode, onDelete, onClearCanvas, onUndo, onRedo, onAutoLayout,
-  onExportPNG, onExportJSON, onImportJSON,
+  onExportPNG, onExportSVG, onExportMermaid, onExportJSON, onImportJSON,
   onOpenAIGenerate, onOpenAIAnalyze,
   diagramName, onDiagramNameChange,
   darkMode, onToggleDarkMode,
@@ -159,8 +162,33 @@ export default function Toolbar({
 
       <Separator orientation="vertical" className="h-6" />
 
-      <ToolbarButton icon={Image} label="Exportar PNG" onClick={onExportPNG} />
-      <ToolbarButton icon={Download} label="Exportar JSON" onClick={onExportJSON} />
+      <DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9">
+                <Download className="h-4 w-4" />
+                <ChevronDown className="h-3 w-3 ml-[-2px]" />
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">Exportar</TooltipContent>
+        </Tooltip>
+        <DropdownMenuContent align="start" className="z-50">
+          <DropdownMenuItem onClick={onExportPNG} className="gap-2">
+            <Image className="h-4 w-4" /> PNG
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onExportSVG} className="gap-2">
+            <FileImage className="h-4 w-4" /> SVG
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onExportMermaid} className="gap-2">
+            <FileCode className="h-4 w-4" /> Mermaid.js
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onExportJSON} className="gap-2">
+            <FileJson className="h-4 w-4" /> JSON
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <ToolbarButton icon={Upload} label="Importar JSON" onClick={onImportJSON} />
 
       <Separator orientation="vertical" className="h-6" />
