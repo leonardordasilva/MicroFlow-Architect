@@ -74,7 +74,33 @@ serve(async (req) => {
       });
     }
 
-    const { diagram } = await req.json();
+    const body = await req.json();
+    const diagram = body?.diagram;
+
+    // Input validation: ensure diagram is an object with nodes/edges arrays
+    if (!diagram || typeof diagram !== 'object') {
+      return new Response(JSON.stringify({ error: "Invalid input: diagram object required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (Array.isArray(diagram.nodes) && diagram.nodes.length > 200) {
+      return new Response(JSON.stringify({ error: "Too many nodes (max 200)" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (Array.isArray(diagram.edges) && diagram.edges.length > 500) {
+      return new Response(JSON.stringify({ error: "Too many edges (max 500)" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // Limit serialized size to 500KB
+    const diagramStr = JSON.stringify(diagram);
+    if (diagramStr.length > 512000) {
+      return new Response(JSON.stringify({ error: "Payload too large (max 500KB)" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("API key not configured");
 
@@ -90,7 +116,7 @@ Include:
 
 Be specific and actionable. Reference actual services by name.`;
 
-    const diagramDescription = JSON.stringify(diagram, null, 2);
+    const diagramDescription = diagramStr;
 
     const result = await callWithFallback(LOVABLE_API_KEY, [
       { role: "system", content: systemPrompt },

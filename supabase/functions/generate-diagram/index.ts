@@ -74,7 +74,26 @@ serve(async (req) => {
       });
     }
 
-    const { description } = await req.json();
+    const body = await req.json();
+    const description = body?.description;
+
+    // Input validation
+    if (!description || typeof description !== 'string') {
+      return new Response(JSON.stringify({ error: "Invalid input: description string required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (description.length < 5) {
+      return new Response(JSON.stringify({ error: "Description too short (min 5 chars)" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (description.length > 5000) {
+      return new Response(JSON.stringify({ error: "Description too long (max 5000 chars)" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("API key not configured");
 

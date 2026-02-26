@@ -19,6 +19,7 @@ export type Database = {
           created_at: string
           edges: Json
           id: string
+          is_shared: boolean
           nodes: Json
           owner_id: string
           share_token: string | null
@@ -29,6 +30,7 @@ export type Database = {
           created_at?: string
           edges?: Json
           id?: string
+          is_shared?: boolean
           nodes?: Json
           owner_id: string
           share_token?: string | null
@@ -39,6 +41,7 @@ export type Database = {
           created_at?: string
           edges?: Json
           id?: string
+          is_shared?: boolean
           nodes?: Json
           owner_id?: string
           share_token?: string | null
@@ -52,7 +55,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_diagram_by_share_token: {
+        Args: { token: string }
+        Returns: {
+          created_at: string
+          edges: Json
+          id: string
+          is_shared: boolean
+          nodes: Json
+          owner_id: string
+          share_token: string | null
+          title: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "diagrams"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
     }
     Enums: {
       [_ in never]: never

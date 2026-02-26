@@ -51,12 +51,9 @@ export async function saveDiagram(
 
 export async function loadDiagramByToken(shareToken: string): Promise<DiagramRecord | null> {
   const { data, error } = await supabase
-    .from('diagrams')
-    .select('*')
-    .eq('share_token', shareToken)
-    .single();
-  if (error) return null;
-  return data as unknown as DiagramRecord;
+    .rpc('get_diagram_by_share_token', { token: shareToken });
+  if (error || !data || data.length === 0) return null;
+  return data[0] as unknown as DiagramRecord;
 }
 
 export async function loadUserDiagrams(userId: string): Promise<DiagramRecord[]> {
@@ -93,12 +90,33 @@ export async function renameDiagram(id: string, title: string): Promise<void> {
 }
 
 export async function shareDiagram(diagramId: string): Promise<string | null> {
-  const { data, error } = await supabase
+  // First ensure the diagram has a share_token and is marked as shared
+  const { data: existing, error: fetchError } = await supabase
     .from('diagrams')
-    .select('share_token')
+    .select('share_token, is_shared')
     .eq('id', diagramId)
     .single();
 
-  if (error || !data?.share_token) return null;
-  return `${window.location.origin}/diagram/${data.share_token}`;
+  if (fetchError) return null;
+
+  let shareToken = existing?.share_token;
+
+  // Generate a share token if one doesn't exist
+  if (!shareToken) {
+    const randomBytes = crypto.getRandomValues(new Uint8Array(8));
+    shareToken = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Update the diagram to be shared with the token
+  const { error: updateError } = await supabase
+    .from('diagrams')
+    .update({
+      share_token: shareToken,
+      is_shared: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', diagramId);
+
+  if (updateError) return null;
+  return `${window.location.origin}/diagram/${shareToken}`;
 }
