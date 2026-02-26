@@ -414,14 +414,6 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleShare} disabled={saving} aria-label="Compartilhar">
-                  <Share2 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">Compartilhar</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={signOut} aria-label="Sair">
                   <LogOut className="h-4 w-4" />
                 </Button>
