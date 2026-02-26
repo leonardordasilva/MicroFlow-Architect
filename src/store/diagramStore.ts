@@ -9,7 +9,7 @@ import {
   type EdgeChange,
 } from '@xyflow/react';
 import type { DiagramNode, DiagramEdge, DiagramNodeData, NodeType } from '@/types/diagram';
-import { getLayoutedElements } from '@/services/layoutService';
+import { getLayoutedElements, getELKLayoutedElements, type LayoutDirection } from '@/services/layoutService';
 
 const createNodeId = () => `node_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
@@ -36,7 +36,8 @@ interface DiagramActions {
   addNode: (type: NodeType, subType?: string) => void;
   addNodesFromSource: (sourceNodeId: string, type: NodeType, count: number, subType?: string) => void;
   deleteSelected: () => void;
-  autoLayout: (direction?: 'TB' | 'LR') => void;
+  autoLayout: (direction?: LayoutDirection) => void;
+  autoLayoutELK: (direction?: LayoutDirection) => Promise<void>;
   clearCanvas: () => void;
   loadDiagram: (nodes: DiagramNode[], edges: DiagramEdge[]) => void;
   exportJSON: () => string;
@@ -229,9 +230,15 @@ export const useDiagramStore = create<DiagramStore>()(
         });
       },
 
-      autoLayout: (direction = 'LR') => {
+      autoLayout: (direction: LayoutDirection = 'LR') => {
         const { nodes, edges } = get();
-        const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodes, edges, direction);
+        const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodes, edges, direction as 'TB' | 'LR');
+        set({ nodes: layoutedNodes, edges: layoutedEdges });
+      },
+
+      autoLayoutELK: async (direction: LayoutDirection = 'LR') => {
+        const { nodes, edges } = get();
+        const { nodes: layoutedNodes, edges: layoutedEdges } = await getELKLayoutedElements(nodes, edges, direction);
         set({ nodes: layoutedNodes, edges: layoutedEdges });
       },
 

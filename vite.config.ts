@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: {
           'react-flow': ['@xyflow/react'],
-          'layout-engines': ['dagre'],
+          'layout-engines': ['dagre', 'elkjs'],
           'export-utils': ['html-to-image'],
           'supabase': ['@supabase/supabase-js'],
         },

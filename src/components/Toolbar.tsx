@@ -15,7 +15,7 @@ interface ToolbarProps {
   onClearCanvas: () => void;
   onUndo: () => void;
   onRedo: () => void;
-  onAutoLayout: () => void;
+  onAutoLayout: (engine: string, direction: string) => void;
   onExportPNG: () => void;
   onExportJSON: () => void;
   onImportJSON: () => void;
@@ -101,7 +101,25 @@ export default function Toolbar({
       <ToolbarButton icon={XCircle} label="Limpar Diagrama" onClick={onClearCanvas} />
       <ToolbarButton icon={Undo2} label="Desfazer (Ctrl+Z)" onClick={onUndo} />
       <ToolbarButton icon={Redo2} label="Refazer (Ctrl+Y)" onClick={onRedo} />
-      <ToolbarButton icon={LayoutGrid} label="Auto Layout" onClick={onAutoLayout} />
+      <DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9">
+                <LayoutGrid className="h-4 w-4" />
+                <ChevronDown className="h-3 w-3 ml-[-2px]" />
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">Auto Layout</TooltipContent>
+        </Tooltip>
+        <DropdownMenuContent align="start" className="z-50">
+          <DropdownMenuItem onClick={() => onAutoLayout('elk', 'LR')}>ELK — Esquerda → Direita</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAutoLayout('elk', 'TB')}>ELK — Cima → Baixo</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAutoLayout('dagre', 'LR')}>Dagre — Horizontal</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAutoLayout('dagre', 'TB')}>Dagre — Vertical</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <Separator orientation="vertical" className="h-6" />
 

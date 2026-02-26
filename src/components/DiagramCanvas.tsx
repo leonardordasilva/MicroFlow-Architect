@@ -69,6 +69,7 @@ export default function DiagramCanvas() {
       addNodesFromSource: s.addNodesFromSource,
       deleteSelected: s.deleteSelected,
       autoLayout: s.autoLayout,
+      autoLayoutELK: s.autoLayoutELK,
       clearCanvas: s.clearCanvas,
       loadDiagram: s.loadDiagram,
       exportJSON: s.exportJSON,
@@ -175,7 +176,13 @@ export default function DiagramCanvas() {
           onClearCanvas={() => setShowClearConfirm(true)}
           onUndo={undo}
           onRedo={redo}
-          onAutoLayout={() => storeActions.autoLayout('LR')}
+          onAutoLayout={(engine, direction) => {
+            if (engine === 'elk') {
+              storeActions.autoLayoutELK(direction as any);
+            } else {
+              storeActions.autoLayout(direction as any);
+            }
+          }}
           onExportPNG={handleExportPNG}
           onExportJSON={handleExportJSON}
           onImportJSON={() => setShowImportJSON(true)}
@@ -267,7 +274,7 @@ export default function DiagramCanvas() {
         onOpenChange={setShowAIGenerate}
         onGenerate={(newNodes, newEdges) => {
           storeActions.loadDiagram(newNodes, newEdges);
-          storeActions.autoLayout('LR');
+          storeActions.autoLayoutELK('LR');
         }}
       />
 
