@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDiagramStore } from '@/store/diagramStore';
-import type { DiagramNode, DiagramNodeData } from '@/types/diagram';
+import type { DiagramNode, DiagramNodeData, ExternalCategory } from '@/types/diagram';
 
 interface NodePropertiesPanelProps {
   nodeId: string | null;
@@ -117,6 +118,28 @@ export default function NodePropertiesPanel({ nodeId, onClose }: NodePropertiesP
             className="h-9 text-sm"
           />
         </div>
+
+        {node.type === 'external' && (
+          <>
+            <Separator />
+            <div className="space-y-1.5">
+              <Label className="text-xs">Categoria</Label>
+              <Select
+                value={data.externalCategory || 'Other'}
+                onValueChange={(val) => updateNode({ externalCategory: val as ExternalCategory })}
+              >
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(['API', 'CDN', 'Auth', 'Payment', 'Storage', 'Analytics', 'Other'] as ExternalCategory[]).map((cat) => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
 
         {node.type === 'service' && (
           <>

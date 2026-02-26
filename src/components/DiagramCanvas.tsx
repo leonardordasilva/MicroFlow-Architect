@@ -511,7 +511,7 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
             onClose={() => setSelectedNodeId(null)}
           />
         )}
-        <DiagramLegend />
+        <DiagramLegend edges={edges} />
       </div>
 
       <StatusBar nodes={nodes} edges={edges} />

@@ -1,9 +1,20 @@
 import { memo, useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Globe, Wifi, Share2, Lock, Hexagon } from 'lucide-react';
-import type { DiagramNodeData } from '@/types/diagram';
+import { Globe, Wifi, Share2, Lock, Hexagon, CreditCard, Database, BarChart3, Shield, Box } from 'lucide-react';
+import type { DiagramNodeData, ExternalCategory } from '@/types/diagram';
 import { useDiagramStore } from '@/store/diagramStore';
 
+const CATEGORY_ICONS: Record<ExternalCategory, React.ElementType> = {
+  API: Globe,
+  CDN: Wifi,
+  Auth: Shield,
+  Payment: CreditCard,
+  Storage: Database,
+  Analytics: BarChart3,
+  Other: Box,
+};
+
+// Legacy fallback for subType-based icons
 const PROTOCOL_ICONS: Record<string, React.ElementType> = {
   REST: Globe,
   gRPC: Hexagon,
@@ -16,8 +27,12 @@ const ExternalNode = memo(({ data, id, selected }: NodeProps) => {
   const nodeData = data as unknown as DiagramNodeData;
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState(nodeData.label);
+  const category = nodeData.externalCategory;
   const protocol = nodeData.subType || 'REST';
-  const Icon = PROTOCOL_ICONS[protocol] || Globe;
+
+  // Use category icon if set, otherwise fallback to legacy protocol icon
+  const Icon = category ? (CATEGORY_ICONS[category] || Globe) : (PROTOCOL_ICONS[protocol] || Globe);
+  const displayLabel = category || protocol;
 
   const handleDoubleClick = () => setEditing(true);
   const handleBlur = () => {
@@ -59,7 +74,7 @@ const ExternalNode = memo(({ data, id, selected }: NodeProps) => {
           </span>
         )}
       </div>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{protocol}</div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{displayLabel}</div>
 
       <Handle id="bottom-target" type="target" position={Position.Bottom} className="!w-3 !h-3 !bg-[hsl(var(--node-external))]" />
       <Handle id="bottom-source" type="source" position={Position.Bottom} className="!w-3 !h-3 !bg-[hsl(var(--node-external))]" />

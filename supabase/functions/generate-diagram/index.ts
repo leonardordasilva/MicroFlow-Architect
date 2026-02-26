@@ -109,6 +109,7 @@ Return ONLY valid JSON with this exact structure:
       "data": {
         "label": "Node Name",
         "type": "service" | "database" | "queue" | "external",
+        "externalCategory": "API" | "CDN" | "Auth" | "Payment" | "Storage" | "Analytics" | "Other",
         "internalDatabases": [],
         "internalServices": []
       }
@@ -129,17 +130,17 @@ Return ONLY valid JSON with this exact structure:
   ]
 }
 
+For nodes with type "external", ALWAYS set externalCategory to one of: API, CDN, Auth, Payment, Storage, Analytics, Other.
+- API: generic third-party APIs
+- CDN: content delivery networks (Cloudflare, Akamai)
+- Auth: authentication providers (Auth0, Firebase Auth, Keycloak)
+- Payment: payment gateways (Stripe, PayPal)
+- Storage: cloud storage (S3, GCS, Azure Blob)
+- Analytics: analytics/monitoring (Datadog, New Relic, Mixpanel)
+- Other: anything that doesn't fit above
+
 Valid protocol values for data.protocol and label:
-- REST → HTTP/REST between services (service→service)
-- gRPC → gRPC between services (service→service, high-performance)
-- GraphQL → GraphQL API calls (service→external or service→service)
-- WebSocket → Real-time bidirectional (service→service or service→external)
-- Kafka → Kafka consumer (queue→service)
-- AMQP → RabbitMQ/AMQP producer (service→queue)
-- MQTT → IoT messaging (service→queue or queue→service)
-- HTTPS → External HTTPS calls (service→external)
-- TCP → Direct TCP/database connections (service→database)
-- UDP → UDP datagram (service→service, rarely)
+- REST, gRPC, GraphQL, WebSocket, Kafka, AMQP, MQTT, HTTPS, TCP, UDP
 
 Protocol Assignment Rules:
 - service → service: use "REST" (default) or "gRPC" for high-performance

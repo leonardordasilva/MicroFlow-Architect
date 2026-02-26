@@ -34,10 +34,13 @@ export const PROTOCOL_CONFIGS: Record<EdgeProtocol, ProtocolConfig> = {
   UDP:       { label: 'UDP',       color: 'hsl(15, 80%, 50%)',   async: true,  dashArray: '2 4' },
 };
 
+export type ExternalCategory = 'API' | 'CDN' | 'Auth' | 'Payment' | 'Storage' | 'Analytics' | 'Other';
+
 export interface DiagramNodeData {
   label: string;
   type: NodeType;
   subType?: string;
+  externalCategory?: ExternalCategory;
   internalDatabases?: string[];
   internalServices?: string[];
   [key: string]: unknown;

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import {
   loadUserDiagrams,
@@ -46,12 +46,24 @@ export default function MyDiagrams() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
 
-  const { data: diagrams = [], isLoading, isError } = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['diagrams', user?.id],
-    queryFn: () => loadUserDiagrams(user!.id),
+    queryFn: ({ pageParam = 0 }) => loadUserDiagrams(user!.id, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      lastPage.hasMore ? lastPageParam + 1 : undefined,
     enabled: !!user,
     staleTime: 30_000,
   });
+
+  const diagrams = data?.pages.flatMap((p) => p.diagrams) ?? [];
 
   const deleteMutation = useMutation({
     mutationFn: deleteDiagram,
@@ -91,7 +103,8 @@ export default function MyDiagrams() {
 
   const handleShare = async (e: React.MouseEvent, d: DiagramRecord) => {
     e.stopPropagation();
-    const url = await shareDiagram(d.id);
+    if (!user) return;
+    const url = await shareDiagram(d.id, user.id);
     if (url) {
       await navigator.clipboard.writeText(url);
       toast({ title: 'Link copiado!', description: url });
@@ -143,76 +156,90 @@ export default function MyDiagrams() {
             </Button>
           </div>
         ) : !isError ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {diagrams.map((d) => (
-              <div
-                key={d.id}
-                className="group relative flex cursor-pointer flex-col rounded-xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
-                onClick={() => handleLoad(d)}
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  {editingId === d.id ? (
-                    <Input
-                      autoFocus
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleRename(d.id);
-                        if (e.key === 'Escape') setEditingId(null);
+          <>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {diagrams.map((d) => (
+                <div
+                  key={d.id}
+                  className="group relative flex cursor-pointer flex-col rounded-xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+                  onClick={() => handleLoad(d)}
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    {editingId === d.id ? (
+                      <Input
+                        autoFocus
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleRename(d.id);
+                          if (e.key === 'Escape') setEditingId(null);
+                        }}
+                        onBlur={() => handleRename(d.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-7 text-sm"
+                      />
+                    ) : (
+                      <h3 className="truncate font-semibold text-foreground">{d.title}</h3>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {d.nodes.length} nós · {d.edges.length} conexões
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Atualizado em {format(new Date(d.updated_at), 'dd/MM/yyyy HH:mm')}
+                  </p>
+                  <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={(e) => handleShare(e, d)}
+                      aria-label="Compartilhar"
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingId(d.id);
+                        setEditTitle(d.title);
                       }}
-                      onBlur={() => handleRename(d.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-7 text-sm"
-                    />
-                  ) : (
-                    <h3 className="truncate font-semibold text-foreground">{d.title}</h3>
-                  )}
+                      aria-label="Renomear"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteId(d.id);
+                      }}
+                      aria-label="Excluir"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {d.nodes.length} nós · {d.edges.length} conexões
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Atualizado em {format(new Date(d.updated_at), 'dd/MM/yyyy HH:mm')}
-                </p>
-                <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={(e) => handleShare(e, d)}
-                    aria-label="Compartilhar"
-                  >
-                    <Share2 className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingId(d.id);
-                      setEditTitle(d.title);
-                    }}
-                    aria-label="Renomear"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-destructive hover:text-destructive"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteId(d.id);
-                    }}
-                    aria-label="Excluir"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
+              ))}
+            </div>
+
+            {hasNextPage && (
+              <div className="mt-6 flex justify-center">
+                <Button
+                  variant="outline"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                >
+                  {isFetchingNextPage ? 'Carregando...' : 'Carregar mais'}
+                </Button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         ) : null}
       </div>
 
