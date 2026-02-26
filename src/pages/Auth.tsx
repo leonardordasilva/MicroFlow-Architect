@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useDiagramStore } from '@/store/diagramStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,6 +33,11 @@ export default function AuthPage() {
       if (view === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        // Clear canvas on fresh login
+        const store = useDiagramStore.getState();
+        store.clearCanvas();
+        store.setDiagramName('Novo Diagrama');
+        store.setCurrentDiagramId(undefined);
         toast({ title: 'Login realizado com sucesso!' });
       } else {
         const { error } = await supabase.auth.signUp({

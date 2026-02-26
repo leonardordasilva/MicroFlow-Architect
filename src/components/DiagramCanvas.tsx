@@ -143,14 +143,9 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
     });
   }, []);
 
-  // Initialize light mode (default) and clear canvas on mount
+  // Initialize light mode (default)
   useEffect(() => {
     document.documentElement.classList.remove('dark');
-    // Clear canvas so dashboard always starts clean
-    const store = useDiagramStore.getState();
-    store.clearCanvas();
-    store.setDiagramName('Novo Diagrama');
-    store.setCurrentDiagramId(undefined);
   }, []);
 
   const handleExportPNG = useCallback(async () => {
