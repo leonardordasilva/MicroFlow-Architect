@@ -33,6 +33,9 @@ import AIAnalysisPanel from '@/components/AIAnalysisPanel';
 import ImportJSONModal from '@/components/ImportJSONModal';
 import SpawnFromNodeModal from '@/components/SpawnFromNodeModal';
 import type { DiagramNodeData } from '@/types/diagram';
+import { useAutoSave } from '@/hooks/useAutoSave';
+import RecoveryBanner from '@/components/RecoveryBanner';
+import { Check, Loader2 } from 'lucide-react';
 
 const nodeTypes = {
   service: ServiceNode,
@@ -75,6 +78,7 @@ export default function DiagramCanvas() {
   const undo = useCallback(() => getTemporalActions().undo(), []);
   const redo = useCallback(() => getTemporalActions().redo(), []);
 
+  const { saveStatus } = useAutoSave();
   const [darkMode, setDarkMode] = useState(true);
   const [showAIGenerate, setShowAIGenerate] = useState(false);
   const [showAIAnalysis, setShowAIAnalysis] = useState(false);
@@ -164,7 +168,7 @@ export default function DiagramCanvas() {
 
   return (
     <div className="flex h-screen w-screen flex-col bg-background" onKeyDown={handleKeyDown} tabIndex={0}>
-      <header className="flex items-center justify-center border-b bg-card/80 px-4 py-2 backdrop-blur-sm">
+      <header className="flex items-center justify-center gap-3 border-b bg-card/80 px-4 py-2 backdrop-blur-sm">
         <Toolbar
           onAddNode={storeActions.addNode}
           onDelete={storeActions.deleteSelected}
@@ -182,9 +186,20 @@ export default function DiagramCanvas() {
           darkMode={darkMode}
           onToggleDarkMode={toggleDarkMode}
         />
+        {saveStatus === 'saving' && (
+          <span className="flex items-center gap-1 text-xs text-muted-foreground animate-pulse">
+            <Loader2 className="h-3 w-3 animate-spin" /> Salvando...
+          </span>
+        )}
+        {saveStatus === 'saved' && (
+          <span className="flex items-center gap-1 text-xs text-green-400">
+            <Check className="h-3 w-3" /> Salvo
+          </span>
+        )}
       </header>
 
       <div className="flex-1 relative" ref={reactFlowWrapper}>
+        <RecoveryBanner />
         <ReactFlow
           nodes={nodes}
           edges={edges}
