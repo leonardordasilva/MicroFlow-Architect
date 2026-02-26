@@ -17,6 +17,7 @@ interface DiagramState {
   nodes: DiagramNode[];
   edges: DiagramEdge[];
   diagramName: string;
+  currentDiagramId: string | undefined;
   isAnalyzing: boolean;
   analysisResult: string | null;
 }
@@ -25,6 +26,7 @@ interface DiagramActions {
   setNodes: (nodes: DiagramNode[]) => void;
   setEdges: (edges: DiagramEdge[]) => void;
   setDiagramName: (name: string) => void;
+  setCurrentDiagramId: (id: string | undefined) => void;
   setIsAnalyzing: (value: boolean) => void;
   setAnalysisResult: (result: string | null) => void;
 
@@ -56,6 +58,7 @@ export const useDiagramStore = create<DiagramStore>()(
       nodes: [],
       edges: [],
       diagramName: 'Novo Diagrama',
+      currentDiagramId: undefined,
       isAnalyzing: false,
       analysisResult: null,
 
@@ -63,6 +66,7 @@ export const useDiagramStore = create<DiagramStore>()(
       setNodes: (nodes) => set({ nodes }),
       setEdges: (edges) => set({ edges }),
       setDiagramName: (diagramName) => set({ diagramName }),
+      setCurrentDiagramId: (currentDiagramId) => set({ currentDiagramId }),
       setIsAnalyzing: (isAnalyzing) => set({ isAnalyzing }),
       setAnalysisResult: (analysisResult) => set({ analysisResult }),
 

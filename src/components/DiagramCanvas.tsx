@@ -36,14 +36,14 @@ import SpawnFromNodeModal from '@/components/SpawnFromNodeModal';
 import type { DiagramNodeData, EdgeProtocol, NodeType } from '@/types/diagram';
 import { exportToMermaid } from '@/services/exportService';
 import MermaidExportModal from '@/components/MermaidExportModal';
-import ShareModal from '@/components/ShareModal';
+
 import { useAutoSave } from '@/hooks/useAutoSave';
 import RecoveryBanner from '@/components/RecoveryBanner';
 import { useAuth } from '@/hooks/useAuth';
 import { saveDiagram } from '@/services/diagramService';
 import { useRealtimeCollab } from '@/hooks/useRealtimeCollab';
 import { inferProtocol } from '@/utils/protocolInference';
-import { Check, Loader2, Share2, Save, LogOut, Keyboard, FolderOpen } from 'lucide-react';
+import { Check, Loader2, Save, LogOut, Keyboard, FolderOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -78,6 +78,7 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
   const nodes = useDiagramStore((s) => s.nodes);
   const edges = useDiagramStore((s) => s.edges);
   const diagramName = useDiagramStore((s) => s.diagramName);
+  const diagramId = useDiagramStore((s) => s.currentDiagramId);
 
   // Get action references directly - they're stable in Zustand
   const storeActions = useMemo(() => {
@@ -113,8 +114,8 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string; nodeLabel: string } | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [mermaidCode, setMermaidCode] = useState<string | null>(null);
-  const [diagramId, setDiagramId] = useState<string | undefined>();
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const setDiagramId = useDiagramStore.getState().setCurrentDiagramId;
+  
   const [saving, setSaving] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -322,22 +323,6 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
       setSaving(false);
     }
   }, [user, diagramName, nodes, edges, diagramId, shareToken]);
-
-  const handleShare = useCallback(async () => {
-    if (!user) return;
-    setSaving(true);
-    try {
-      const record = await saveDiagram(diagramName, nodes, edges, user.id, diagramId);
-      setDiagramId(record.id);
-      if (record.share_token) {
-        setShareUrl(`${window.location.origin}/diagram/${record.share_token}`);
-      }
-    } catch (err: any) {
-      toast({ title: 'Erro ao compartilhar', description: err.message, variant: 'destructive' });
-    } finally {
-      setSaving(false);
-    }
-  }, [user, diagramName, nodes, edges, diagramId]);
 
   return (
     <ReactFlowProvider>
@@ -562,11 +547,6 @@ export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
         code={mermaidCode || ''}
       />
 
-      <ShareModal
-        open={!!shareUrl}
-        onOpenChange={(open) => { if (!open) setShareUrl(null); }}
-        shareUrl={shareUrl || ''}
-      />
 
       <KeyboardShortcutsModal
         open={showShortcuts}
