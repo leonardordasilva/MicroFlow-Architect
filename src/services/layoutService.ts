@@ -1,5 +1,5 @@
 import dagre from 'dagre';
-import ELK from 'elkjs/lib/elk.bundled.js';
+import ELK from 'elkjs';
 import type { DiagramNode, DiagramEdge } from '@/types/diagram';
 
 const NODE_WIDTH = 180;
