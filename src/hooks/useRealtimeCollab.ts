@@ -21,7 +21,9 @@ const AVATAR_COLORS = [
 ];
 
 export function useRealtimeCollab(shareToken: string | null) {
+  const diagramId = useDiagramStore((s) => s.currentDiagramId);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const dbChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isRemoteUpdate = useRef(false);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
@@ -42,6 +44,7 @@ export function useRealtimeCollab(shareToken: string | null) {
     [],
   );
 
+  // Broadcast channel for live cursor-style updates
   useEffect(() => {
     if (!shareToken) return;
 
@@ -54,7 +57,6 @@ export function useRealtimeCollab(shareToken: string | null) {
         const { nodes, edges } = payload.payload as { nodes: DiagramNode[]; edges: DiagramEdge[] };
         isRemoteUpdate.current = true;
 
-        // Suspend undo history: remote updates should not create undo entries
         const temporal = useDiagramStore.temporal.getState();
         temporal.pause();
 
@@ -107,6 +109,63 @@ export function useRealtimeCollab(shareToken: string | null) {
       channelRef.current = null;
     };
   }, [shareToken]);
+
+  // Postgres Realtime channel: listen for DB-level updates on the current diagram
+  useEffect(() => {
+    if (!diagramId) return;
+
+    const dbChannel = supabase
+      .channel(`db-diagram:${diagramId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'diagrams',
+          filter: `id=eq.${diagramId}`,
+        },
+        (payload) => {
+          // Ignore if this client just saved (isRemoteUpdate flag or saving state)
+          if (isRemoteUpdate.current) return;
+
+          const newRecord = payload.new as any;
+          const store = useDiagramStore.getState();
+          const remoteNodes = newRecord.nodes as DiagramNode[];
+          const remoteEdges = newRecord.edges as DiagramEdge[];
+
+          // Skip if data is identical (our own save echoing back)
+          if (
+            JSON.stringify(remoteNodes) === JSON.stringify(store.nodes) &&
+            JSON.stringify(remoteEdges) === JSON.stringify(store.edges)
+          ) {
+            return;
+          }
+
+          isRemoteUpdate.current = true;
+          const temporal = useDiagramStore.temporal.getState();
+          temporal.pause();
+
+          store.setNodes(remoteNodes);
+          store.setEdges(remoteEdges);
+          if (newRecord.title && newRecord.title !== store.diagramName) {
+            store.setDiagramName(newRecord.title);
+          }
+
+          temporal.resume();
+          setTimeout(() => {
+            isRemoteUpdate.current = false;
+          }, 50);
+        },
+      )
+      .subscribe();
+
+    dbChannelRef.current = dbChannel;
+
+    return () => {
+      supabase.removeChannel(dbChannel);
+      dbChannelRef.current = null;
+    };
+  }, [diagramId]);
 
   return { broadcastChanges, isRemoteUpdate, collaborators };
 }

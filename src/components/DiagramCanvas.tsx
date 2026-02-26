@@ -39,12 +39,12 @@ import { exportToMermaid } from '@/services/exportService';
 import MermaidExportModal from '@/components/MermaidExportModal';
 
 import { useAuth } from '@/hooks/useAuth';
-import { saveDiagram, saveSharedDiagram, loadDiagramById } from '@/services/diagramService';
+import { saveDiagram, saveSharedDiagram } from '@/services/diagramService';
 import { useRealtimeCollab } from '@/hooks/useRealtimeCollab';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import RecoveryBanner from '@/components/RecoveryBanner';
 import { inferProtocol } from '@/utils/protocolInference';
-import { Loader2, Save, LogOut, Keyboard, FolderOpen, RefreshCw } from 'lucide-react';
+import { Loader2, Save, LogOut, Keyboard, FolderOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -119,7 +119,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
   const setDiagramId = useDiagramStore.getState().setCurrentDiagramId;
   
   const [saving, setSaving] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [protocolEdgeId, setProtocolEdgeId] = useState<string | null>(null);
@@ -335,46 +335,6 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     }
   }, [user, diagramName, nodes, edges, diagramId, shareToken, isCollaborator]);
 
-  // Refresh diagram from cloud to check for collaborator changes
-  const handleRefreshDiagram = useCallback(async () => {
-    if (!diagramId) {
-      toast({ title: 'Diagrama ainda não salvo na nuvem', variant: 'destructive' });
-      return;
-    }
-    setRefreshing(true);
-    try {
-      const record = await loadDiagramById(diagramId);
-      if (!record) {
-        toast({ title: 'Diagrama não encontrado', variant: 'destructive' });
-        return;
-      }
-      const currentUpdated = useDiagramStore.getState().nodes;
-      const remoteNodes = record.nodes as any[];
-      const remoteEdges = record.edges as any[];
-
-      // Compare by serialization to detect changes
-      const hasChanges =
-        JSON.stringify(remoteNodes) !== JSON.stringify(nodes) ||
-        JSON.stringify(remoteEdges) !== JSON.stringify(edges);
-
-      if (hasChanges) {
-        const temporal = useDiagramStore.temporal.getState();
-        temporal.pause();
-        storeActions.loadDiagram(remoteNodes, remoteEdges);
-        if (record.title !== diagramName) {
-          storeActions.setDiagramName(record.title);
-        }
-        temporal.resume();
-        toast({ title: 'Diagrama atualizado!', description: 'Alterações de colaboradores foram carregadas.' });
-      } else {
-        toast({ title: 'Diagrama já está atualizado', description: 'Nenhuma alteração encontrada.' });
-      }
-    } catch (err: any) {
-      toast({ title: 'Erro ao atualizar', description: err.message, variant: 'destructive' });
-    } finally {
-      setRefreshing(false);
-    }
-  }, [diagramId, nodes, edges, diagramName, storeActions]);
 
   // Smart node positioning using viewport center
   const handleAddNode = useCallback(
@@ -452,14 +412,6 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">Meus Diagramas</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleRefreshDiagram} disabled={refreshing || !diagramId} aria-label="Atualizar diagrama">
-                  {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">Atualizar diagrama</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
