@@ -39,12 +39,12 @@ import { exportToMermaid } from '@/services/exportService';
 import MermaidExportModal from '@/components/MermaidExportModal';
 
 import { useAuth } from '@/hooks/useAuth';
-import { saveDiagram, saveSharedDiagram } from '@/services/diagramService';
+import { saveDiagram, saveSharedDiagram, loadDiagramById } from '@/services/diagramService';
 import { useRealtimeCollab } from '@/hooks/useRealtimeCollab';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import RecoveryBanner from '@/components/RecoveryBanner';
 import { inferProtocol } from '@/utils/protocolInference';
-import { Loader2, Save, LogOut, Keyboard, FolderOpen } from 'lucide-react';
+import { Loader2, Save, LogOut, Keyboard, FolderOpen, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -119,6 +119,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
   const setDiagramId = useDiagramStore.getState().setCurrentDiagramId;
   
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -335,6 +336,36 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     }
   }, [user, diagramName, nodes, edges, diagramId, shareToken, isCollaborator]);
 
+  const handleRefreshDiagram = useCallback(async () => {
+    if (!diagramId) {
+      toast({ title: 'Salve o diagrama primeiro para poder atualizar.' });
+      return;
+    }
+    setRefreshing(true);
+    try {
+      const record = await loadDiagramById(diagramId);
+      if (!record) {
+        toast({ title: 'Diagrama não encontrado', variant: 'destructive' });
+        return;
+      }
+      const remoteNodes = JSON.stringify(record.nodes);
+      const remoteEdges = JSON.stringify(record.edges);
+      if (remoteNodes !== JSON.stringify(nodes) || remoteEdges !== JSON.stringify(edges)) {
+        const temporal = useDiagramStore.temporal.getState();
+        temporal.pause();
+        storeActions.loadDiagram(record.nodes as any, record.edges as any);
+        temporal.resume();
+        toast({ title: 'Diagrama atualizado com sucesso!' });
+      } else {
+        toast({ title: 'Diagrama já está atualizado.' });
+      }
+    } catch {
+      toast({ title: 'Erro ao atualizar diagrama', variant: 'destructive' });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [diagramId, nodes, edges, storeActions]);
+
 
   // Smart node positioning using viewport center
   const handleAddNode = useCallback(
@@ -412,6 +443,14 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">Meus Diagramas</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleRefreshDiagram} disabled={refreshing} aria-label="Atualizar diagrama">
+                  {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Atualizar diagrama</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
