@@ -4,16 +4,25 @@ import { useDiagramStore } from '@/store/diagramStore';
 import { X, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+const RECOVERY_FLAG_KEY = 'microflow_show_recovery';
+
+/** Call this to signal that a recovery banner should appear on next canvas load */
+export function triggerRecoveryBanner() {
+  sessionStorage.setItem(RECOVERY_FLAG_KEY, '1');
+}
+
 export default function RecoveryBanner() {
   const [savedData, setSavedData] = useState<AutoSaveData | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const nodes = useDiagramStore((s) => s.nodes);
 
   useEffect(() => {
-    // Only show if canvas is empty and autosave exists
-    if (nodes.length === 0 && !dismissed) {
+    // Only show if explicitly triggered (e.g. after deleting a diagram)
+    const flag = sessionStorage.getItem(RECOVERY_FLAG_KEY);
+    if (flag && nodes.length === 0 && !dismissed) {
       const data = getAutoSave();
       setSavedData(data);
+      sessionStorage.removeItem(RECOVERY_FLAG_KEY);
     }
   }, []); // Run once on mount
 
