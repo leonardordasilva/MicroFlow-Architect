@@ -5,10 +5,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Trash2, Search, Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Trash2, Search } from 'lucide-react';
 import {
   searchUsersByEmail, shareDiagramWithUser, listDiagramShares, revokeShare,
-  listUsersPaginated,
   type ShareRecord,
 } from '@/services/shareService';
 
@@ -33,13 +32,7 @@ export default function ShareDiagramModal({ open, onOpenChange, diagramId, owner
   const [shares, setShares] = useState<ShareRecord[]>([]);
   const [loadingShares, setLoadingShares] = useState(false);
 
-  // Paginated user list
-  const [allUsers, setAllUsers] = useState<UserResult[]>([]);
-  const [usersPage, setUsersPage] = useState(0);
-  const [usersHasMore, setUsersHasMore] = useState(false);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-
-  // Load existing shares + first page of users
+  // Load existing shares on open
   useEffect(() => {
     if (open && diagramId) {
       setLoadingShares(true);
@@ -47,19 +40,8 @@ export default function ShareDiagramModal({ open, onOpenChange, diagramId, owner
       setQuery('');
       setResults([]);
       setSelected(new Set());
-      setUsersPage(0);
-      loadUsersPage(0);
     }
   }, [open, diagramId]);
-
-  const loadUsersPage = useCallback(async (page: number) => {
-    setLoadingUsers(true);
-    const { users, hasMore } = await listUsersPaginated(page, ownerId);
-    setAllUsers(users);
-    setUsersHasMore(hasMore);
-    setUsersPage(page);
-    setLoadingUsers(false);
-  }, [ownerId]);
 
   // Debounced search
   useEffect(() => {
@@ -119,11 +101,8 @@ export default function ShareDiagramModal({ open, onOpenChange, diagramId, owner
     }
   };
 
-  const isSearching = query.trim().length > 0;
-
-  // Users to display: search results or paginated list
-  const displayUsers = isSearching ? results : allUsers;
-  const isLoadingList = isSearching ? searching : loadingUsers;
+  const displayUsers = results;
+  const isLoadingList = searching;
 
   const renderUserRow = (user: UserResult) => {
     const alreadyShared = alreadySharedIds.has(user.id);
@@ -169,7 +148,7 @@ export default function ShareDiagramModal({ open, onOpenChange, diagramId, owner
             />
           </div>
 
-          {/* User list (search results or paginated) */}
+          {/* User list (search results only) */}
           <div className="border rounded-md max-h-56 overflow-y-auto">
             {isLoadingList ? (
               <div className="flex justify-center py-6">
@@ -177,41 +156,12 @@ export default function ShareDiagramModal({ open, onOpenChange, diagramId, owner
               </div>
             ) : displayUsers.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-6">
-                {isSearching ? 'Nenhum usuário encontrado' : 'Nenhum usuário cadastrado'}
+                {query.trim() === '' ? 'Digite um e-mail para buscar usuários' : 'Nenhum usuário encontrado'}
               </p>
             ) : (
               displayUsers.map(renderUserRow)
             )}
           </div>
-
-          {/* Pagination (only when not searching) */}
-          {!isSearching && !isLoadingList && (allUsers.length > 0 || usersPage > 0) && (
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Página {usersPage + 1}</span>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  disabled={usersPage === 0}
-                  onClick={() => loadUsersPage(usersPage - 1)}
-                  aria-label="Página anterior"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  disabled={!usersHasMore}
-                  onClick={() => loadUsersPage(usersPage + 1)}
-                  aria-label="Próxima página"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
 
           {/* Selected count + share button */}
           {selected.size > 0 && (

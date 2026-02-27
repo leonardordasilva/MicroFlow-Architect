@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useDiagramStore } from './diagramStore';
 import type { ExternalCategory } from '@/types/diagram';
+import {
+  deleteDiagram,
+  renameDiagram,
+  saveSharedDiagram,
+} from '@/services/diagramService';
 
 const { getState } = useDiagramStore;
 
@@ -390,5 +395,28 @@ describe('diagramStore', () => {
       expect(typeof node.position.x).toBe('number');
       expect(typeof node.position.y).toBe('number');
     });
+  });
+});
+
+// ── Épico 8: Testes de contratos de segurança ──────────────────────────────
+
+describe('deleteDiagram signature (security contract)', () => {
+  it('deleteDiagram aceita dois argumentos: id e ownerId', () => {
+    expect(typeof deleteDiagram).toBe('function');
+    expect(deleteDiagram.length).toBe(2);
+  });
+});
+
+describe('renameDiagram signature (security contract)', () => {
+  it('renameDiagram aceita três argumentos: id, title e ownerId', () => {
+    expect(typeof renameDiagram).toBe('function');
+    expect(renameDiagram.length).toBe(3);
+  });
+});
+
+describe('saveSharedDiagram signature (security contract)', () => {
+  it('saveSharedDiagram aceita exatamente três argumentos: diagramId, nodes, edges', () => {
+    expect(typeof saveSharedDiagram).toBe('function');
+    expect(saveSharedDiagram.length).toBe(3);
   });
 });

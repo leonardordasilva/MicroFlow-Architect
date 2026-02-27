@@ -27,28 +27,6 @@ export async function searchUsersByEmail(
   return data;
 }
 
-const USERS_PAGE_SIZE = 10;
-
-/** List all users paginated, ordered by email, excluding a specific user */
-export async function listUsersPaginated(
-  page: number,
-  excludeUserId: string,
-): Promise<{ users: { id: string; email: string }[]; hasMore: boolean }> {
-  const from = page * USERS_PAGE_SIZE;
-  const to = from + USERS_PAGE_SIZE;
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, email')
-    .neq('id', excludeUserId)
-    .order('email', { ascending: true })
-    .range(from, to);
-  if (error || !data) return { users: [], hasMore: false };
-  const hasMore = data.length > USERS_PAGE_SIZE;
-  return {
-    users: hasMore ? data.slice(0, USERS_PAGE_SIZE) : data,
-    hasMore,
-  };
-}
 
 export async function findUserByEmail(email: string): Promise<{ id: string; email: string } | null> {
   const { data, error } = await supabase

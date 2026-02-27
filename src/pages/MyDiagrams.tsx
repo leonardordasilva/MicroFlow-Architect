@@ -40,7 +40,7 @@ export default function MyDiagrams() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; ownerId: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [shareTarget, setShareTarget] = useState<{ diagramId: string; ownerId: string } | null>(null);
@@ -71,18 +71,18 @@ export default function MyDiagrams() {
   }, [user?.id]);
 
   const deleteMutation = useMutation({
-    mutationFn: deleteDiagram,
+    mutationFn: ({ id, ownerId }: { id: string; ownerId: string }) => deleteDiagram(id, ownerId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['diagrams', user?.id] });
       triggerRecoveryBanner();
       toast({ title: 'Diagrama excluído' });
-      setDeleteId(null);
+      setDeleteTarget(null);
     },
     onError: () => toast({ title: 'Erro ao excluir', variant: 'destructive' }),
   });
 
   const renameMutation = useMutation({
-    mutationFn: ({ id, title }: { id: string; title: string }) => renameDiagram(id, title),
+    mutationFn: ({ id, title }: { id: string; title: string }) => renameDiagram(id, title, user!.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['diagrams', user?.id] });
       toast({ title: 'Diagrama renomeado' });
@@ -92,7 +92,7 @@ export default function MyDiagrams() {
   });
 
   const handleDelete = () => {
-    if (deleteId) deleteMutation.mutate(deleteId);
+    if (deleteTarget) deleteMutation.mutate(deleteTarget);
   };
 
   const handleRename = (id: string) => {
@@ -224,7 +224,7 @@ export default function MyDiagrams() {
                       <Button
                         variant="ghost" size="icon"
                         className="h-7 w-7 text-destructive hover:text-destructive"
-                        onClick={(e) => { e.stopPropagation(); setDeleteId(d.id); }}
+                        onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: d.id, ownerId: d.owner_id }); }}
                         aria-label="Excluir"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -281,7 +281,7 @@ export default function MyDiagrams() {
         ) : null}
       </div>
 
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir diagrama</AlertDialogTitle>

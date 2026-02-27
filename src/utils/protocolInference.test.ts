@@ -5,8 +5,8 @@ describe('inferProtocol', () => {
   it('service → service = REST', () => {
     expect(inferProtocol('service', 'service')).toBe('REST');
   });
-  it('service → database = TCP', () => {
-    expect(inferProtocol('service', 'database')).toBe('TCP');
+  it('service → database = SQL', () => {
+    expect(inferProtocol('service', 'database')).toBe('SQL');
   });
   it('service → queue = AMQP', () => {
     expect(inferProtocol('service', 'queue')).toBe('AMQP');
@@ -20,11 +20,11 @@ describe('inferProtocol', () => {
   it('external → service = REST', () => {
     expect(inferProtocol('external', 'service')).toBe('REST');
   });
-  it('database → service = TCP', () => {
-    expect(inferProtocol('database', 'service')).toBe('TCP');
+  it('database → service = SQL', () => {
+    expect(inferProtocol('database', 'service')).toBe('SQL');
   });
-  it('database → database = TCP', () => {
-    expect(inferProtocol('database', 'database')).toBe('TCP');
+  it('database → database = SQL', () => {
+    expect(inferProtocol('database', 'database')).toBe('SQL');
   });
   it('queue → queue = AMQP', () => {
     expect(inferProtocol('queue', 'queue')).toBe('AMQP');

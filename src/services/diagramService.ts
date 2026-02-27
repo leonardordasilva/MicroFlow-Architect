@@ -87,31 +87,16 @@ export async function loadDiagramById(id: string): Promise<DiagramRecord | null>
   return data as unknown as DiagramRecord;
 }
 
-export async function deleteDiagram(id: string): Promise<void> {
-  const { error } = await supabase.from('diagrams').delete().eq('id', id);
+export async function deleteDiagram(id: string, ownerId: string): Promise<void> {
+  const { error } = await supabase.from('diagrams').delete().eq('id', id).eq('owner_id', ownerId);
   if (error) throw error;
 }
 
 export async function saveSharedDiagram(
   diagramId: string,
-  collaboratorId: string,
-  title: string,
   nodes: DiagramNode[],
   edges: DiagramEdge[],
 ): Promise<void> {
-  // Verify collaborator has permission via diagram_shares
-  const { data: share, error: shareError } = await supabase
-    .from('diagram_shares')
-    .select('id')
-    .eq('diagram_id', diagramId)
-    .eq('shared_with_id', collaboratorId)
-    .maybeSingle();
-
-  if (shareError || !share) {
-    throw new Error('Você não tem permissão de edição neste diagrama.');
-  }
-
-  // Save only nodes, edges and updated_at (not title — only owner can rename)
   const { error } = await supabase
     .from('diagrams')
     .update({
@@ -121,10 +106,12 @@ export async function saveSharedDiagram(
     })
     .eq('id', diagramId);
 
-  if (error) throw error;
+  if (error) {
+    throw new Error('Você não tem permissão de edição neste diagrama.');
+  }
 }
 
-export async function renameDiagram(id: string, title: string): Promise<void> {
+export async function renameDiagram(id: string, title: string, ownerId: string): Promise<void> {
   const trimmed = title.trim();
   if (!trimmed || trimmed.length > 100) {
     throw new Error('Título inválido: deve ter entre 1 e 100 caracteres');
@@ -132,37 +119,15 @@ export async function renameDiagram(id: string, title: string): Promise<void> {
   const { error } = await supabase
     .from('diagrams')
     .update({ title: trimmed, updated_at: new Date().toISOString() })
-    .eq('id', id);
+    .eq('id', id)
+    .eq('owner_id', ownerId);
   if (error) throw error;
 }
 
-export async function shareDiagram(diagramId: string, ownerId: string): Promise<string | null> {
-  const { data: existing, error: fetchError } = await supabase
-    .from('diagrams')
-    .select('share_token, is_shared')
-    .eq('id', diagramId)
-    .eq('owner_id', ownerId)
-    .single();
-
-  if (fetchError) return null;
-
-  let shareToken = existing?.share_token;
-
-  if (!shareToken) {
-    const randomBytes = crypto.getRandomValues(new Uint8Array(8));
-    shareToken = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-
-  const { error: updateError } = await supabase
-    .from('diagrams')
-    .update({
-      share_token: shareToken,
-      is_shared: true,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', diagramId)
-    .eq('owner_id', ownerId);
-
-  if (updateError) return null;
-  return `${window.location.origin}/diagram/${shareToken}`;
+export async function shareDiagram(diagramId: string): Promise<string | null> {
+  const { data, error } = await supabase.functions.invoke('share-diagram', {
+    body: { diagramId },
+  });
+  if (error || !data?.shareUrl) return null;
+  return data.shareUrl as string;
 }

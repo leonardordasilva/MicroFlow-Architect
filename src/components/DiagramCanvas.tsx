@@ -312,8 +312,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     setSaving(true);
     try {
       if (isCollaborator && diagramId) {
-        // Save collaborative edits to the original diagram
-        await saveSharedDiagram(diagramId, user.id, diagramName, nodes, edges);
+        await saveSharedDiagram(diagramId, nodes, edges);
         toast({ title: 'Alterações salvas no diagrama compartilhado!' });
       } else {
         const isSharedContext = !!shareToken && !diagramId;

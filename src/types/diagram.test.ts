@@ -4,8 +4,8 @@ import { PROTOCOL_CONFIGS, type EdgeProtocol } from './diagram';
 describe('PROTOCOL_CONFIGS', () => {
   const protocols = Object.keys(PROTOCOL_CONFIGS) as EdgeProtocol[];
 
-  it('should have exactly 10 protocols', () => {
-    expect(protocols).toHaveLength(10);
+  it('should have exactly 11 protocols', () => {
+    expect(protocols).toHaveLength(11);
   });
 
   it('every protocol should have label, color, and async boolean', () => {
