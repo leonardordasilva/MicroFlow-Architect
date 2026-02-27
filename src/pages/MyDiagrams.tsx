@@ -22,6 +22,7 @@ import { Plus, Trash2, Pencil, ArrowLeft, FileText, Share2, RefreshCw, Loader2, 
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import ShareDiagramModal from '@/components/ShareDiagramModal';
+import { triggerRecoveryBanner } from '@/components/RecoveryBanner';
 
 function DiagramCardSkeleton() {
   return (
@@ -73,6 +74,7 @@ export default function MyDiagrams() {
     mutationFn: deleteDiagram,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['diagrams', user?.id] });
+      triggerRecoveryBanner();
       toast({ title: 'Diagrama excluído' });
       setDeleteId(null);
     },
