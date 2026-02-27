@@ -21,12 +21,22 @@ export { PROTOCOL_CONFIGS, type ProtocolConfig } from '@/constants/protocolConfi
 
 export type ExternalCategory = 'API' | 'CDN' | 'Auth' | 'Payment' | 'Storage' | 'Analytics' | 'Other';
 
+export interface InternalDatabase {
+  label: string;
+  dbType: string;
+}
+
+export function normalizeInternalDb(item: string | InternalDatabase): InternalDatabase {
+  if (typeof item === 'string') return { label: item, dbType: 'Oracle' };
+  return item;
+}
+
 export interface DiagramNodeData {
   label: string;
   type: NodeType;
   subType?: string;
   externalCategory?: ExternalCategory;
-  internalDatabases?: string[];
+  internalDatabases?: (string | InternalDatabase)[];
   internalServices?: string[];
   [key: string]: unknown;
 }

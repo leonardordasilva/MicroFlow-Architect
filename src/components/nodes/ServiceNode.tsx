@@ -2,6 +2,7 @@ import { memo, useState, useEffect } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { Box, Database, Server } from 'lucide-react';
 import type { DiagramNodeData } from '@/types/diagram';
+import { normalizeInternalDb } from '@/types/diagram';
 import { useDiagramStore } from '@/store/diagramStore';
 import { getDbColor } from '@/constants/databaseColors';
 
@@ -54,8 +55,8 @@ const ServiceNode = memo(({ data, id, selected }: NodeProps) => {
   };
 
   const handleDbRename = (index: number, newName: string) => {
-    const currentDbs = nodeData.internalDatabases ?? [];
-    const updated = currentDbs.map((db, i) => (i === index ? newName : db));
+    const currentDbs = (nodeData.internalDatabases ?? []).map(normalizeInternalDb);
+    const updated = currentDbs.map((db, i) => (i === index ? { ...db, label: newName } : db));
     useDiagramStore.getState().setNodes(
       useDiagramStore.getState().nodes.map((n) =>
         n.id === id ? { ...n, data: { ...n.data, internalDatabases: updated } } : n
@@ -117,12 +118,15 @@ const ServiceNode = memo(({ data, id, selected }: NodeProps) => {
 
       {nodeData.internalDatabases && nodeData.internalDatabases.length > 0 && (
         <div className="mt-2 space-y-1">
-          {nodeData.internalDatabases.map((db, i) => (
-            <div key={i} className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Database className="h-3 w-3" style={{ color: getDbColor('Oracle') }} />
-              <EditableDbItem value={db} onChange={(v) => handleDbRename(i, v)} />
-            </div>
-          ))}
+          {nodeData.internalDatabases.map((rawDb, i) => {
+            const db = normalizeInternalDb(rawDb);
+            return (
+              <div key={i} className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Database className="h-3 w-3" style={{ color: getDbColor(db.dbType) }} />
+                <EditableDbItem value={db.label} onChange={(v) => handleDbRename(i, v)} />
+              </div>
+            );
+          })}
         </div>
       )}
 

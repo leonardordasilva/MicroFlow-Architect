@@ -6,7 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDiagramStore } from '@/store/diagramStore';
-import type { DiagramNode, DiagramNodeData, ExternalCategory } from '@/types/diagram';
+import type { DiagramNode, DiagramNodeData, ExternalCategory, InternalDatabase } from '@/types/diagram';
+import { normalizeInternalDb } from '@/types/diagram';
+import { DATABASE_TYPES } from '@/constants/databaseColors';
 
 interface NodePropertiesPanelProps {
   nodeId: string | null;
@@ -21,13 +23,13 @@ export default function NodePropertiesPanel({ nodeId, onClose }: NodePropertiesP
   const data = node?.data as unknown as DiagramNodeData | undefined;
 
   const [label, setLabel] = useState('');
-  const [internalDbs, setInternalDbs] = useState<string[]>([]);
+  const [internalDbs, setInternalDbs] = useState<InternalDatabase[]>([]);
   const [internalSvcs, setInternalSvcs] = useState<string[]>([]);
 
   useEffect(() => {
     if (data) {
       setLabel(data.label);
-      setInternalDbs(data.internalDatabases || []);
+      setInternalDbs((data.internalDatabases || []).map(normalizeInternalDb));
       setInternalSvcs(data.internalServices || []);
     }
   }, [nodeId, data?.label]);
@@ -47,15 +49,22 @@ export default function NodePropertiesPanel({ nodeId, onClose }: NodePropertiesP
     updateNode({ label: value });
   };
 
-  const handleDbChange = (index: number, value: string) => {
+  const handleDbLabelChange = (index: number, value: string) => {
     const updated = [...internalDbs];
-    updated[index] = value;
+    updated[index] = { ...updated[index], label: value };
+    setInternalDbs(updated);
+    updateNode({ internalDatabases: updated });
+  };
+
+  const handleDbTypeChange = (index: number, value: string) => {
+    const updated = [...internalDbs];
+    updated[index] = { ...updated[index], dbType: value };
     setInternalDbs(updated);
     updateNode({ internalDatabases: updated });
   };
 
   const addDb = () => {
-    const updated = [...internalDbs, `Oracle ${internalDbs.length + 1}`];
+    const updated = [...internalDbs, { label: `DB ${internalDbs.length + 1}`, dbType: 'Oracle' }];
     setInternalDbs(updated);
     updateNode({ internalDatabases: updated });
   };
@@ -153,9 +162,19 @@ export default function NodePropertiesPanel({ nodeId, onClose }: NodePropertiesP
               </div>
               {internalDbs.map((db, i) => (
                 <div key={i} className="flex items-center gap-1">
+                  <Select value={db.dbType} onValueChange={(val) => handleDbTypeChange(i, val)}>
+                    <SelectTrigger className="h-8 text-xs w-24 shrink-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DATABASE_TYPES.map((t) => (
+                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Input
-                    value={db}
-                    onChange={(e) => handleDbChange(i, e.target.value)}
+                    value={db.label}
+                    onChange={(e) => handleDbLabelChange(i, e.target.value)}
                     className="h-8 text-xs flex-1"
                   />
                   <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => removeDb(i)} aria-label="Remover banco">

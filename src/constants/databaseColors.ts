@@ -3,6 +3,8 @@ export const DATABASE_COLORS: Record<string, string> = {
   Redis: '#DC382C',
 };
 
+export const DATABASE_TYPES = Object.keys(DATABASE_COLORS);
+
 export const DEFAULT_DB_COLOR = 'hsl(142, 71%, 45%)';
 
 export function getDbColor(subType?: string): string {

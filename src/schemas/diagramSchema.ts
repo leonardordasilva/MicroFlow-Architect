@@ -13,6 +13,7 @@ const EXTERNAL_CATEGORIES = [
 
 const InternalItemSchema = z.union([
   z.string().min(1),
+  z.object({ label: z.string(), dbType: z.string() }),
   z.object({ id: z.string(), label: z.string() }).transform((obj) => obj.label),
   z.object({ label: z.string() }).transform((obj) => obj.label),
 ]);
