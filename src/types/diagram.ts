@@ -12,7 +12,8 @@ export type EdgeProtocol =
   | 'MQTT'
   | 'HTTPS'
   | 'TCP'
-  | 'UDP';
+  | 'UDP'
+  | 'SQL';
 
 // ProtocolConfig and PROTOCOL_CONFIGS moved to src/constants/protocolConfigs.ts
 // Re-export for backwards compat

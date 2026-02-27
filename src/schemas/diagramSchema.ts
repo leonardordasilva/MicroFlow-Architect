@@ -4,7 +4,7 @@ const NODE_TYPES = ['service', 'database', 'queue', 'external'] as const;
 
 const EDGE_PROTOCOLS = [
   'REST', 'gRPC', 'GraphQL', 'WebSocket',
-  'Kafka', 'AMQP', 'MQTT', 'HTTPS', 'TCP', 'UDP',
+  'Kafka', 'AMQP', 'MQTT', 'HTTPS', 'TCP', 'UDP', 'SQL',
 ] as const;
 
 const EXTERNAL_CATEGORIES = [

@@ -18,4 +18,5 @@ export const PROTOCOL_CONFIGS: Record<EdgeProtocol, ProtocolConfig> = {
   HTTPS:     { label: 'HTTPS',     color: 'hsl(200, 80%, 50%)',  async: false },
   TCP:       { label: 'TCP',       color: 'hsl(45, 93%, 47%)',   async: false },
   UDP:       { label: 'UDP',       color: 'hsl(15, 80%, 50%)',   async: true,  dashArray: '2 4' },
+  SQL:       { label: 'SQL',       color: 'hsl(190, 80%, 45%)',  async: false },
 };

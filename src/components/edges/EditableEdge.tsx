@@ -100,7 +100,7 @@ export default function EditableEdge({
   const handleSegmentPointerDown = useCallback(
     (segIdx: number, orientation: 'h' | 'v') =>
       (evt: React.PointerEvent) => {
-        evt.stopPropagation();
+        // Don't stop propagation so ReactFlow can still select the edge
         evt.preventDefault();
 
         const svg = (evt.target as Element).closest('svg') as SVGSVGElement;
