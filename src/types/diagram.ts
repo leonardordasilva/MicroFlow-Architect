@@ -1,4 +1,10 @@
 import type { Node, Edge } from '@xyflow/react';
+import type { z } from 'zod';
+import type { NodeSchema, EdgeSchema } from '@/schemas/diagramSchema';
+
+/** Tipo de persistência: estrutura validada pelo Zod e salva no banco */
+export type PersistedNode = z.infer<typeof NodeSchema>;
+export type PersistedEdge = z.infer<typeof EdgeSchema>;
 
 export type NodeType = 'service' | 'database' | 'queue' | 'external';
 

@@ -52,8 +52,8 @@ interface DiagramActions {
 
 type DiagramStore = DiagramState & DiagramActions;
 
-// Only track nodes/edges/diagramName for undo/redo
-// Undo/redo tracks nodes, edges, and diagramName via the equality/partialize config below
+/** Slice rastreado pelo undo/redo — apenas nodes, edges e diagramName */
+type UndoSlice = Pick<DiagramStore, 'nodes' | 'edges' | 'diagramName'>;
 
 export const useDiagramStore = create<DiagramStore>()(
   temporal(
@@ -239,11 +239,12 @@ export const useDiagramStore = create<DiagramStore>()(
         pastState.nodes === currentState.nodes &&
         pastState.edges === currentState.edges &&
         pastState.diagramName === currentState.diagramName,
-      partialize: (state) => ({
-        nodes: state.nodes,
-        edges: state.edges,
-        diagramName: state.diagramName,
-      } as unknown as DiagramStore),
+      partialize: (state): DiagramStore =>
+        ({
+          nodes: state.nodes,
+          edges: state.edges,
+          diagramName: state.diagramName,
+        } as unknown as DiagramStore), // zundo: partialize requer o tipo completo do store; apenas UndoSlice é rastreado
     },
   ),
 );
