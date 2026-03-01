@@ -91,7 +91,7 @@ export async function getELKLayoutedElements(
   const layouted = await elkInstance.layout(graph);
 
   const layoutedNodes = nodes.map((node) => {
-    const elkNode = layouted.children?.find((n: any) => n.id === node.id);
+    const elkNode = layouted.children?.find((n) => n.id === node.id);
     return {
       ...node,
       position: {

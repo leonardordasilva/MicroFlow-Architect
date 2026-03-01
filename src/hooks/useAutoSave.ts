@@ -20,13 +20,25 @@ export type SaveStatus = 'idle' | 'saving' | 'saved';
 async function compressString(input: string): Promise<string> {
   const blob = new Blob([input]);
   const stream = blob.stream().pipeThrough(new CompressionStream('gzip'));
-  const compressedBlob = await new Response(stream).blob();
-  const buffer = await compressedBlob.arrayBuffer();
-  // Convert to base64 for localStorage storage
-  const bytes = new Uint8Array(buffer);
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalLength = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    totalLength += value.length;
+  }
+  // Merge chunks into a single Uint8Array, then convert to base64
+  const merged = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
   let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < merged.length; i++) {
+    binary += String.fromCharCode(merged[i]);
   }
   return btoa(binary);
 }

@@ -151,15 +151,6 @@ export function useRealtimeCollab(shareToken: string | null) {
           const remoteNodes = newRecord.nodes as DiagramNode[];
           const remoteEdges = newRecord.edges as DiagramEdge[];
 
-          // Quick length check before any serialization
-          if (
-            remoteNodes.length === store.nodes.length &&
-            remoteEdges.length === store.edges.length
-          ) {
-            // Only if lengths match, do we need deeper comparison — skip it and just apply
-            // since updated_at already confirmed it's different
-          }
-
           isRemoteUpdate.current = true;
           const temporal = useDiagramStore.temporal.getState();
           temporal.pause();

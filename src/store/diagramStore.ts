@@ -52,7 +52,7 @@ interface DiagramActions {
 type DiagramStore = DiagramState & DiagramActions;
 
 // Only track nodes/edges/diagramName for undo/redo
-const TRACKED_KEYS: (keyof DiagramState)[] = ['nodes', 'edges', 'diagramName'];
+// Undo/redo tracks nodes, edges, and diagramName via the equality/partialize config below
 
 export const useDiagramStore = create<DiagramStore>()(
   temporal(
@@ -139,7 +139,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const sourceNode = nodes.find((n) => n.id === sourceNodeId);
         if (!sourceNode) return;
 
-        const sourceData = sourceNode.data as unknown as DiagramNodeData;
+        const sourceData: DiagramNodeData = sourceNode.data;
 
         // Embed Oracle inside service
         if (type === 'database' && subType === 'Oracle' && sourceNode.type === 'service') {

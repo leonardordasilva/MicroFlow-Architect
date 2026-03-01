@@ -29,11 +29,13 @@ function toDiagramRecord(row: DiagramRow): DiagramRecord {
     throw new Error('Dados do diagrama corrompidos no banco de dados. ID: ' + row.id);
   }
 
+  // Zod .passthrough() makes output keys structurally optional; after successful
+  // validation we know id/source/target etc. exist, so the cast is safe.
   return {
     id: row.id,
     title: row.title,
-    nodes: nodesParsed.data as DiagramNode[],
-    edges: edgesParsed.data as DiagramEdge[],
+    nodes: nodesParsed.data as unknown as DiagramNode[],
+    edges: edgesParsed.data as unknown as DiagramEdge[],
     owner_id: row.owner_id,
     share_token: row.share_token,
     created_at: row.created_at,
@@ -103,7 +105,14 @@ export async function loadUserDiagrams(
     .order('updated_at', { ascending: false })
     .range(from, to);
   if (error) return { diagrams: [], hasMore: false };
-  const rows = (data || []).map(toDiagramRecord);
+  const rows = (data || []).flatMap((row) => {
+    try {
+      return [toDiagramRecord(row)];
+    } catch {
+      console.warn(`Diagrama corrompido ignorado: ${row.id}`);
+      return [];
+    }
+  });
   const hasMore = rows.length > PAGE_SIZE;
   return { diagrams: hasMore ? rows.slice(0, PAGE_SIZE) : rows, hasMore };
 }
