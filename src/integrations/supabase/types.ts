@@ -146,6 +146,8 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_diagram_owner: { Args: { diagram_id: string }; Returns: string }
+      get_diagram_title: { Args: { diagram_id: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never

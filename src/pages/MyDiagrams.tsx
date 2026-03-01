@@ -72,8 +72,15 @@ export default function MyDiagrams() {
 
   const deleteMutation = useMutation({
     mutationFn: ({ id, ownerId }: { id: string; ownerId: string }) => deleteDiagram(id, ownerId),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['diagrams', user?.id] });
+      // If the deleted diagram is currently loaded on the canvas, clear it
+      const store = useDiagramStore.getState();
+      if (store.currentDiagramId === variables.id) {
+        store.clearCanvas();
+        store.setDiagramName('Novo Diagrama');
+        store.setCurrentDiagramId(undefined);
+      }
       triggerRecoveryBanner();
       toast({ title: 'Diagrama excluído' });
       setDeleteTarget(null);
