@@ -34,7 +34,7 @@ import AIGenerateModal from '@/components/AIGenerateModal';
 import AIAnalysisPanel from '@/components/AIAnalysisPanel';
 import ImportJSONModal from '@/components/ImportJSONModal';
 import SpawnFromNodeModal from '@/components/SpawnFromNodeModal';
-import type { DiagramNodeData, EdgeProtocol, NodeType } from '@/types/diagram';
+import type { DiagramNodeData, NodeType } from '@/types/diagram';
 import { exportToMermaid } from '@/services/exportService';
 import MermaidExportModal from '@/components/MermaidExportModal';
 
@@ -44,6 +44,7 @@ import { useRealtimeCollab } from '@/hooks/useRealtimeCollab';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import RecoveryBanner from '@/components/RecoveryBanner';
 import { inferProtocol } from '@/utils/protocolInference';
+import { canConnect, connectionErrorMessage } from '@/utils/connectionRules';
 import { Loader2, Save, LogOut, Keyboard, FolderOpen, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -52,7 +53,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import NodePropertiesPanel from '@/components/NodePropertiesPanel';
 import StatusBar from '@/components/StatusBar';
 import KeyboardShortcutsModal from '@/components/KeyboardShortcutsModal';
-import ProtocolSelectorModal from '@/components/ProtocolSelectorModal';
+
 import DiagramLegend from '@/components/DiagramLegend';
 import CollaboratorAvatars from '@/components/CollaboratorAvatars';
 
@@ -123,11 +124,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
   
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [protocolEdgeId, setProtocolEdgeId] = useState<string | null>(null);
-  const [pendingProtocolEdge, setPendingProtocolEdge] = useState<{
-    edgeId: string;
-    defaultProtocol: EdgeProtocol;
-  } | null>(null);
+  
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { guides, onNodeDrag, onNodeDragStop } = useSnapGuides(nodes);
   const { broadcastChanges, collaborators } = useRealtimeCollab(shareToken || null);
@@ -250,61 +247,32 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     setSelectedNodeId(null);
   }, []);
 
-  const handleEdgeDoubleClick = useCallback((_event: React.MouseEvent, edge: any) => {
-    setProtocolEdgeId(edge.id);
-  }, []);
+  // Double-click on edge removed — protocol is auto-inferred
 
-  const handleProtocolSelect = useCallback(
-    (protocol: EdgeProtocol) => {
-      if (protocolEdgeId) {
-        storeActions.updateEdgeProtocol(protocolEdgeId, protocol);
-        setProtocolEdgeId(null);
-      }
-    },
-    [protocolEdgeId, storeActions]
-  );
-
-  // Épico 2: Auto protocol on connect
+  // Auto protocol on connect with connection validation
   const handleConnect = useCallback(
     (connection: any) => {
-      // 1. Create edge normally
-      storeActions.onConnect(connection);
-
-      // 2. Determine edge ID (React Flow addEdge format)
-      const edgeId = `reactflow__edge-${connection.source}${connection.sourceHandle || ''}-${connection.target}${connection.targetHandle || ''}`;
-
-      // 3. Infer protocol from node types
       const sourceNode = nodes.find((n) => n.id === connection.source);
       const targetNode = nodes.find((n) => n.id === connection.target);
-      const defaultProtocol = inferProtocol(
-        (sourceNode?.type ?? 'service') as NodeType,
-        (targetNode?.type ?? 'service') as NodeType,
-      );
+      const srcType = (sourceNode?.type ?? 'service') as NodeType;
+      const tgtType = (targetNode?.type ?? 'service') as NodeType;
 
-      // 4. Open modal with pre-selected protocol
-      setPendingProtocolEdge({ edgeId, defaultProtocol });
+      // Validate connection
+      if (!canConnect(srcType, tgtType)) {
+        toast({ title: connectionErrorMessage(srcType, tgtType), variant: 'destructive' });
+        return;
+      }
+
+      // Create edge
+      storeActions.onConnect(connection);
+
+      // Auto-apply inferred protocol
+      const edgeId = `reactflow__edge-${connection.source}${connection.sourceHandle || ''}-${connection.target}${connection.targetHandle || ''}`;
+      const protocol = inferProtocol(srcType, tgtType);
+      storeActions.updateEdgeProtocol(edgeId, protocol);
     },
     [storeActions, nodes]
   );
-
-  const handlePendingProtocolSelect = useCallback(
-    (protocol: EdgeProtocol) => {
-      if (pendingProtocolEdge) {
-        storeActions.updateEdgeProtocol(pendingProtocolEdge.edgeId, protocol);
-        setPendingProtocolEdge(null);
-      }
-    },
-    [pendingProtocolEdge, storeActions]
-  );
-
-  const handlePendingProtocolCancel = useCallback(() => {
-    if (pendingProtocolEdge) {
-      // Remove the edge that was just created
-      const store = useDiagramStore.getState();
-      store.setEdges(store.edges.filter((e) => e.id !== pendingProtocolEdge.edgeId));
-      setPendingProtocolEdge(null);
-    }
-  }, [pendingProtocolEdge]);
 
   // Épico 7: Fork feedback + Épico 6: Collaborative save
   const handleSaveToCloud = useCallback(async () => {
@@ -496,7 +464,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
           onNodeContextMenu={handleNodeContextMenu}
           onPaneClick={handlePaneClick}
           onNodeClick={handleNodeClick}
-          onEdgeDoubleClick={handleEdgeDoubleClick}
+          /* edge double-click protocol selector removed */
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
@@ -616,24 +584,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
         onOpenChange={setShowShortcuts}
       />
 
-      {/* Existing edge double-click protocol selector */}
-      <ProtocolSelectorModal
-        open={!!protocolEdgeId}
-        onOpenChange={(open) => { if (!open) setProtocolEdgeId(null); }}
-        currentProtocol={protocolEdgeId ? (edges.find((e) => e.id === protocolEdgeId)?.data as any)?.protocol : undefined}
-        onSelect={handleProtocolSelect}
-      />
-
-      {/* New edge protocol selector with inference */}
-      <ProtocolSelectorModal
-        open={!!pendingProtocolEdge}
-        onOpenChange={(open) => {
-          if (!open) handlePendingProtocolCancel();
-        }}
-        defaultProtocol={pendingProtocolEdge?.defaultProtocol}
-        onSelect={handlePendingProtocolSelect}
-        onCancel={handlePendingProtocolCancel}
-      />
+      {/* Protocol selector kept for manual override if needed */}
     </div>
   );
 }
