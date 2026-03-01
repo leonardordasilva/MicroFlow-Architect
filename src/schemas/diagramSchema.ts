@@ -51,3 +51,7 @@ export const ImportDiagramSchema = z.object({
 }).passthrough();
 
 export type ImportDiagramInput = z.infer<typeof ImportDiagramSchema>;
+
+/** Schemas for database rows (no min(1) constraint on nodes) */
+export const DbDiagramNodesSchema = z.array(NodeSchema);
+export const DbDiagramEdgesSchema = z.array(EdgeSchema);

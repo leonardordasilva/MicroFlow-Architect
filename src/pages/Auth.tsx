@@ -91,6 +91,7 @@ export default function AuthPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="seu@email.com"
+              autoComplete="email"
               required
             />
           </div>
@@ -98,12 +99,13 @@ export default function AuthPage() {
           {view !== 'forgot' && (
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
-              <Input
+            <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
+                autoComplete={view === 'login' ? 'current-password' : 'new-password'}
                 minLength={6}
                 required
               />
