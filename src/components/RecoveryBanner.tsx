@@ -20,8 +20,9 @@ export default function RecoveryBanner() {
     // Only show if explicitly triggered (e.g. after deleting a diagram)
     const flag = sessionStorage.getItem(RECOVERY_FLAG_KEY);
     if (flag && nodes.length === 0 && !dismissed) {
-      const data = getAutoSave();
-      setSavedData(data);
+      getAutoSave().then((data) => {
+        setSavedData(data);
+      });
       sessionStorage.removeItem(RECOVERY_FLAG_KEY);
     }
   }, []); // Run once on mount
