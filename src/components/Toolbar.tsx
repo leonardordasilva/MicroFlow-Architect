@@ -45,7 +45,7 @@ function ToolbarButton({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button variant={variant} size="icon" className="h-9 w-9" onClick={onClick}>
+        <Button variant={variant} size="icon" className="h-9 w-9" onClick={onClick} aria-label={label}>
           <Icon className="h-4 w-4" />
         </Button>
       </TooltipTrigger>
@@ -60,7 +60,7 @@ function DatabaseDropdown({ onSelect }: { onSelect: (subType: string) => void })
       <Tooltip>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-9 w-9">
+            <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Banco de Dados">
               <Database className="h-4 w-4" />
               <ChevronDown className="h-3 w-3 ml-[-2px]" />
             </Button>
@@ -134,7 +134,7 @@ export default function Toolbar({
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9">
+              <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Fila / Mensageria">
                 <Mail className="h-4 w-4" />
                 <ChevronDown className="h-3 w-3 ml-[-2px]" />
               </Button>
@@ -152,7 +152,7 @@ export default function Toolbar({
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9">
+              <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="API / Protocolo">
                 <Globe className="h-4 w-4" />
                 <ChevronDown className="h-3 w-3 ml-[-2px]" />
               </Button>
@@ -179,7 +179,7 @@ export default function Toolbar({
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9">
+              <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Auto Layout">
                 <LayoutGrid className="h-4 w-4" />
                 <ChevronDown className="h-3 w-3 ml-[-2px]" />
               </Button>
@@ -201,7 +201,7 @@ export default function Toolbar({
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9">
+              <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Exportar">
                 <Download className="h-4 w-4" />
                 <ChevronDown className="h-3 w-3 ml-[-2px]" />
               </Button>
