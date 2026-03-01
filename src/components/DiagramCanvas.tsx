@@ -103,7 +103,12 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
   // QUA-04: Save logic extracted to custom hook
   const { save: handleSaveToCloud, saving, saveRef: handleSaveToCloudRef } = useSaveDiagram({ shareToken });
 
-  const [darkMode, setDarkMode] = useState(false);
+  // UX-04: Initialize dark mode from localStorage or system preference
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('microflow_theme');
+    if (saved !== null) return saved === 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
   const [showAIGenerate, setShowAIGenerate] = useState(false);
   const [showAIAnalysis, setShowAIAnalysis] = useState(false);
   const [showImportJSON, setShowImportJSON] = useState(false);
@@ -129,17 +134,35 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     }
   }, [nodes, edges, shareToken, broadcastChanges]);
 
+  // UX-04: Persist dark mode and apply on mount/change
   const toggleDarkMode = useCallback(() => {
     setDarkMode((prev) => {
       const next = !prev;
       document.documentElement.classList.toggle('dark', next);
+      localStorage.setItem('microflow_theme', next ? 'dark' : 'light');
       return next;
     });
   }, []);
 
-  // Initialize light mode (default)
+  // Apply dark mode on mount
   useEffect(() => {
-    document.documentElement.classList.remove('dark');
+    document.documentElement.classList.toggle('dark', darkMode);
+  }, []);
+
+  // UX-03: Close context menu on scroll, window blur, and Escape
+  useEffect(() => {
+    const closeContextMenu = () => setContextMenu(null);
+    window.addEventListener('blur', closeContextMenu);
+    const wrapper = reactFlowWrapper.current;
+    if (wrapper) {
+      wrapper.addEventListener('scroll', closeContextMenu, true);
+    }
+    return () => {
+      window.removeEventListener('blur', closeContextMenu);
+      if (wrapper) {
+        wrapper.removeEventListener('scroll', closeContextMenu, true);
+      }
+    };
   }, []);
 
   const handleExportPNG = useCallback(async () => {
