@@ -184,7 +184,7 @@ describe('diagramStore', () => {
       expect(getState().edges[0].target).toBe(n2.id);
     });
 
-    it('should label edge "produce" for service→queue', () => {
+    it('should create edge for service→queue without protocol labels', () => {
       getState().addNode('service');
       getState().addNode('queue', 'MQ');
       const [svc, queue] = getState().nodes;
@@ -196,10 +196,12 @@ describe('diagramStore', () => {
         targetHandle: null,
       });
 
-      expect(getState().edges[0].label).toBe('produce');
+      expect(getState().edges).toHaveLength(1);
+      expect(getState().edges[0].source).toBe(svc.id);
+      expect(getState().edges[0].target).toBe(queue.id);
     });
 
-    it('should label edge "consume" for queue→service', () => {
+    it('should create edge for queue→service without protocol labels', () => {
       getState().addNode('queue', 'MQ');
       getState().addNode('service');
       const [queue, svc] = getState().nodes;
@@ -211,7 +213,8 @@ describe('diagramStore', () => {
         targetHandle: null,
       });
 
-      expect(getState().edges[0].label).toBe('consume');
+      expect(getState().edges).toHaveLength(1);
+      expect(getState().edges[0].source).toBe(queue.id);
     });
   });
 

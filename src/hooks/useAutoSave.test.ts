@@ -1,48 +1,48 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { getAutoSave, clearAutoSave, type AutoSaveData } from './useAutoSave';
 
-const STORAGE_KEY = 'microflow_autosave_v1';
+const LEGACY_STORAGE_KEY = 'microflow_autosave_v1';
 
 describe('getAutoSave', () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it('should return null when nothing is saved', () => {
-    expect(getAutoSave()).toBeNull();
+  it('should return null when nothing is saved', async () => {
+    expect(await getAutoSave()).toBeNull();
   });
 
-  it('should return saved data', () => {
+  it('should return saved data from legacy format', async () => {
     const data: AutoSaveData = {
       nodes: [{ id: '1' }],
       edges: [],
       title: 'Test',
       savedAt: new Date().toISOString(),
-      version: '1',
+      version: '2',
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    const result = getAutoSave();
+    localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(data));
+    const result = await getAutoSave();
     expect(result).not.toBeNull();
     expect(result!.title).toBe('Test');
     expect(result!.nodes).toHaveLength(1);
   });
 
-  it('should return null for invalid JSON', () => {
-    localStorage.setItem(STORAGE_KEY, 'not valid json');
-    expect(getAutoSave()).toBeNull();
+  it('should return null for invalid JSON in legacy format', async () => {
+    localStorage.setItem(LEGACY_STORAGE_KEY, 'not valid json');
+    expect(await getAutoSave()).toBeNull();
   });
 
-  it('should return null when nodes/edges are missing', () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ title: 'Test' }));
-    expect(getAutoSave()).toBeNull();
+  it('should return null when nodes/edges are missing', async () => {
+    localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify({ title: 'Test' }));
+    expect(await getAutoSave()).toBeNull();
   });
 });
 
 describe('clearAutoSave', () => {
   it('should remove the saved data', () => {
-    localStorage.setItem(STORAGE_KEY, '{}');
+    localStorage.setItem(LEGACY_STORAGE_KEY, '{}');
     clearAutoSave();
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(LEGACY_STORAGE_KEY)).toBeNull();
   });
 });
 
@@ -51,15 +51,14 @@ describe('getAutoSave edge cases', () => {
     localStorage.clear();
   });
 
-  it('should return null when version is missing', () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes: [], edges: [], title: 'T' }));
-    const result = getAutoSave();
+  it('should return null when version is missing', async () => {
+    localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify({ nodes: [], edges: [], title: 'T' }));
+    const result = await getAutoSave();
     // Still returns data since version isn't validated in getAutoSave
     expect(result).not.toBeNull();
   });
 
-  it('should handle quota exceeded gracefully (empty storage)', () => {
-    // Simulate: data was never persisted due to quota
-    expect(getAutoSave()).toBeNull();
+  it('should handle quota exceeded gracefully (empty storage)', async () => {
+    expect(await getAutoSave()).toBeNull();
   });
 });

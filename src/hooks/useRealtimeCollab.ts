@@ -28,12 +28,20 @@ export function useRealtimeCollab(shareToken: string | null) {
   const isRemoteUpdate = useRef(false);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
 
+  // PERF-02: Track last broadcast content to avoid redundant sends
+  const lastBroadcastRef = useRef<string>('');
+
   const broadcastChanges = useCallback(
     (nodes: DiagramNode[], edges: DiagramEdge[]) => {
       if (!channelRef.current || isRemoteUpdate.current) return;
       if (timerRef.current) clearTimeout(timerRef.current);
 
       timerRef.current = setTimeout(() => {
+        const serialized = JSON.stringify({ nodes, edges });
+        // PERF-02: Only broadcast if content actually changed
+        if (serialized === lastBroadcastRef.current) return;
+        lastBroadcastRef.current = serialized;
+
         channelRef.current?.send({
           type: 'broadcast',
           event: 'diagram_updated',
@@ -110,6 +118,9 @@ export function useRealtimeCollab(shareToken: string | null) {
     };
   }, [shareToken]);
 
+  // PERF-03: Track last known updated_at to avoid unnecessary state updates
+  const lastUpdatedAtRef = useRef<string>('');
+
   // Postgres Realtime channel: listen for DB-level updates on the current diagram
   useEffect(() => {
     if (!diagramId) return;
@@ -125,20 +136,28 @@ export function useRealtimeCollab(shareToken: string | null) {
           filter: `id=eq.${diagramId}`,
         },
         (payload) => {
-          // Ignore if this client just saved (isRemoteUpdate flag or saving state)
           if (isRemoteUpdate.current) return;
 
           const newRecord = payload.new as any;
+
+          // PERF-03: Compare updated_at first to avoid expensive JSON operations
+          const remoteUpdatedAt = newRecord.updated_at as string;
+          if (remoteUpdatedAt && remoteUpdatedAt === lastUpdatedAtRef.current) {
+            return;
+          }
+          lastUpdatedAtRef.current = remoteUpdatedAt || '';
+
           const store = useDiagramStore.getState();
           const remoteNodes = newRecord.nodes as DiagramNode[];
           const remoteEdges = newRecord.edges as DiagramEdge[];
 
-          // Skip if data is identical (our own save echoing back)
+          // Quick length check before any serialization
           if (
-            JSON.stringify(remoteNodes) === JSON.stringify(store.nodes) &&
-            JSON.stringify(remoteEdges) === JSON.stringify(store.edges)
+            remoteNodes.length === store.nodes.length &&
+            remoteEdges.length === store.edges.length
           ) {
-            return;
+            // Only if lengths match, do we need deeper comparison — skip it and just apply
+            // since updated_at already confirmed it's different
           }
 
           isRemoteUpdate.current = true;

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,7 +53,6 @@ import NodePropertiesPanel from '@/components/NodePropertiesPanel';
 import StatusBar from '@/components/StatusBar';
 import KeyboardShortcutsModal from '@/components/KeyboardShortcutsModal';
 
-
 import CollaboratorAvatars from '@/components/CollaboratorAvatars';
 
 const nodeTypes = {
@@ -67,9 +66,6 @@ const edgeTypes = {
   editable: EditableEdge,
 };
 
-// Get stable references to temporal actions (no reactive subscription)
-const getTemporalActions = () => useDiagramStore.temporal.getState();
-
 interface DiagramCanvasProps {
   shareToken?: string;
 }
@@ -82,31 +78,26 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
   const diagramId = useDiagramStore((s) => s.currentDiagramId);
   const isCollaborator = useDiagramStore((s) => s.isCollaborator);
 
-  // Get action references directly - they're stable in Zustand
-  const storeActions = useMemo(() => {
-    const s = useDiagramStore.getState();
-    return {
-      setDiagramName: s.setDiagramName,
-      onNodesChange: s.onNodesChange,
-      onEdgesChange: s.onEdgesChange,
-      onConnect: s.onConnect,
-      onNodeDragHandler: s.onNodeDragHandler,
-      addNode: s.addNode,
-      addNodesFromSource: s.addNodesFromSource,
-      deleteSelected: s.deleteSelected,
-      autoLayout: s.autoLayout,
-      autoLayoutELK: s.autoLayoutELK,
-      clearCanvas: s.clearCanvas,
-      loadDiagram: s.loadDiagram,
-      exportJSON: s.exportJSON,
-      
-    };
-  }, []);
+  // PERF-01/QUA-03: Use stable action references directly from store (Zustand actions are stable by design)
+  const setDiagramName = useDiagramStore((s) => s.setDiagramName);
+  const onNodesChange = useDiagramStore((s) => s.onNodesChange);
+  const onEdgesChange = useDiagramStore((s) => s.onEdgesChange);
+  const onConnectAction = useDiagramStore((s) => s.onConnect);
+  const onNodeDragHandler = useDiagramStore((s) => s.onNodeDragHandler);
+  const addNode = useDiagramStore((s) => s.addNode);
+  const addNodesFromSource = useDiagramStore((s) => s.addNodesFromSource);
+  const deleteSelected = useDiagramStore((s) => s.deleteSelected);
+  const autoLayout = useDiagramStore((s) => s.autoLayout);
+  const autoLayoutELK = useDiagramStore((s) => s.autoLayoutELK);
+  const clearCanvas = useDiagramStore((s) => s.clearCanvas);
+  const loadDiagram = useDiagramStore((s) => s.loadDiagram);
+  const exportJSON = useDiagramStore((s) => s.exportJSON);
+  const setDiagramId = useDiagramStore((s) => s.setCurrentDiagramId);
 
-  const undo = useCallback(() => getTemporalActions().undo(), []);
-  const redo = useCallback(() => getTemporalActions().redo(), []);
+  // QUA-03: Obtain temporal actions inside callbacks, not at module scope
+  const undo = useCallback(() => useDiagramStore.temporal.getState().undo(), []);
+  const redo = useCallback(() => useDiagramStore.temporal.getState().redo(), []);
 
-  
   const { user, signOut } = useAuth();
   const [darkMode, setDarkMode] = useState(false);
   const [showAIGenerate, setShowAIGenerate] = useState(false);
@@ -116,14 +107,13 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string; nodeLabel: string } | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [mermaidCode, setMermaidCode] = useState<string | null>(null);
-  const setDiagramId = useDiagramStore.getState().setCurrentDiagramId;
-  
+
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  
+
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  
+
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { guides, onNodeDrag, onNodeDragStop } = useSnapGuides(nodes);
   const { broadcastChanges, collaborators } = useRealtimeCollab(shareToken || null);
@@ -159,6 +149,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
       a.href = dataUrl;
       a.download = `${diagramName || 'diagram'}.png`;
       a.click();
+      // dataUrl is a data URI, not an Object URL — no revocation needed
       toast({ title: 'PNG exportado com sucesso!' });
     } catch {
       toast({ title: 'Erro ao exportar PNG', variant: 'destructive' });
@@ -174,6 +165,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
       a.href = dataUrl;
       a.download = `${diagramName || 'diagram'}.svg`;
       a.click();
+      // dataUrl is a data URI, not an Object URL — no revocation needed
       toast({ title: 'SVG exportado com sucesso!' });
     } catch {
       toast({ title: 'Erro ao exportar SVG', variant: 'destructive' });
@@ -186,7 +178,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
   }, [nodes, edges]);
 
   const handleExportJSON = useCallback(() => {
-    const json = storeActions.exportJSON();
+    const json = exportJSON();
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -195,78 +187,20 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     a.click();
     URL.revokeObjectURL(url);
     toast({ title: 'JSON exportado com sucesso!' });
-  }, [storeActions, diagramName]);
+  }, [exportJSON, diagramName]);
 
   const handleImport = useCallback(
     (data: { nodes: any[]; edges: any[]; name?: string }) => {
-      storeActions.loadDiagram(data.nodes, data.edges);
-      if (data.name) storeActions.setDiagramName(data.name);
+      loadDiagram(data.nodes, data.edges);
+      if (data.name) setDiagramName(data.name);
       toast({ title: 'Diagrama importado com sucesso!' });
     },
-    [storeActions]
+    [loadDiagram, setDiagramName]
   );
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Delete') storeActions.deleteSelected();
-      if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
-      if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
-      if (e.ctrlKey && e.shiftKey && e.key === 'Z') { e.preventDefault(); redo(); }
-      if (e.ctrlKey && e.key === 's') { e.preventDefault(); handleSaveToCloud(); }
-      if (e.key === '?') setShowShortcuts(true);
-      if (e.key === 'Escape') {
-        setSelectedNodeId(null);
-        setContextMenu(null);
-      }
-    },
-    [storeActions, undo, redo]
-  );
+  // PERF-05: Use ref for handleSaveToCloud to avoid closure stale in handleKeyDown
+  const handleSaveToCloudRef = useRef<() => void>(() => {});
 
-  const handleNodeClick = useCallback((_event: React.MouseEvent, node: any) => {
-    setSelectedNodeId(node.id);
-  }, []);
-
-  const handleNodeContextMenu = useCallback(
-    (event: React.MouseEvent, node: any) => {
-      event.preventDefault();
-      if (node.type === 'database' || node.type === 'external') return;
-      const nodeData = node.data as DiagramNodeData;
-      setContextMenu({
-        x: event.clientX,
-        y: event.clientY,
-        nodeId: node.id,
-        nodeLabel: nodeData.label,
-      });
-    },
-    []
-  );
-
-  const handlePaneClick = useCallback(() => {
-    setContextMenu(null);
-    setSelectedNodeId(null);
-  }, []);
-
-  // Auto protocol on connect with connection validation
-  const handleConnect = useCallback(
-    (connection: any) => {
-      const sourceNode = nodes.find((n) => n.id === connection.source);
-      const targetNode = nodes.find((n) => n.id === connection.target);
-      const srcType = (sourceNode?.type ?? 'service') as NodeType;
-      const tgtType = (targetNode?.type ?? 'service') as NodeType;
-
-      // Validate connection
-      if (!canConnect(srcType, tgtType)) {
-        toast({ title: connectionErrorMessage(srcType, tgtType), variant: 'destructive' });
-        return;
-      }
-
-      // Create edge (protocol is auto-inferred inside onConnect)
-      storeActions.onConnect(connection);
-    },
-    [storeActions, nodes]
-  );
-
-  // Épico 7: Fork feedback + Épico 6: Collaborative save
   const handleSaveToCloud = useCallback(async () => {
     if (!user) return;
     setSaving(true);
@@ -293,7 +227,70 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     } finally {
       setSaving(false);
     }
-  }, [user, diagramName, nodes, edges, diagramId, shareToken, isCollaborator]);
+  }, [user, diagramName, nodes, edges, diagramId, shareToken, isCollaborator, setDiagramId]);
+
+  // Keep ref always up-to-date
+  useEffect(() => {
+    handleSaveToCloudRef.current = handleSaveToCloud;
+  }, [handleSaveToCloud]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Delete') deleteSelected();
+      if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
+      if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
+      if (e.ctrlKey && e.shiftKey && e.key === 'Z') { e.preventDefault(); redo(); }
+      if (e.ctrlKey && e.key === 's') { e.preventDefault(); handleSaveToCloudRef.current(); }
+      if (e.key === '?') setShowShortcuts(true);
+      if (e.key === 'Escape') {
+        setSelectedNodeId(null);
+        setContextMenu(null);
+      }
+    },
+    [deleteSelected, undo, redo]
+  );
+
+  const handleNodeClick = useCallback((_event: React.MouseEvent, node: any) => {
+    setSelectedNodeId(node.id);
+  }, []);
+
+  const handleNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: any) => {
+      event.preventDefault();
+      if (node.type === 'database' || node.type === 'external') return;
+      const nodeData = node.data as DiagramNodeData;
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        nodeId: node.id,
+        nodeLabel: nodeData.label,
+      });
+    },
+    []
+  );
+
+  const handlePaneClick = useCallback(() => {
+    setContextMenu(null);
+    setSelectedNodeId(null);
+  }, []);
+
+  // Connection validation
+  const handleConnect = useCallback(
+    (connection: any) => {
+      const sourceNode = nodes.find((n) => n.id === connection.source);
+      const targetNode = nodes.find((n) => n.id === connection.target);
+      const srcType = (sourceNode?.type ?? 'service') as NodeType;
+      const tgtType = (targetNode?.type ?? 'service') as NodeType;
+
+      if (!canConnect(srcType, tgtType)) {
+        toast({ title: connectionErrorMessage(srcType, tgtType), variant: 'destructive' });
+        return;
+      }
+
+      onConnectAction(connection);
+    },
+    [onConnectAction, nodes]
+  );
 
   const handleRefreshDiagram = useCallback(async () => {
     if (!diagramId) {
@@ -312,7 +309,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
       if (remoteNodes !== JSON.stringify(nodes) || remoteEdges !== JSON.stringify(edges)) {
         const temporal = useDiagramStore.temporal.getState();
         temporal.pause();
-        storeActions.loadDiagram(record.nodes as any, record.edges as any);
+        loadDiagram(record.nodes as any, record.edges as any);
         temporal.resume();
         toast({ title: 'Diagrama atualizado com sucesso!' });
       } else {
@@ -323,8 +320,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     } finally {
       setRefreshing(false);
     }
-  }, [diagramId, nodes, edges, storeActions]);
-
+  }, [diagramId, nodes, edges, loadDiagram]);
 
   // Smart node positioning using viewport center
   const handleAddNode = useCallback(
@@ -338,28 +334,30 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
           x: rect.left + rect.width / 2 + jx,
           y: rect.top + rect.height / 2 + jy,
         });
-        storeActions.addNode(type, subType, pos);
+        addNode(type, subType, pos);
       } else {
-        storeActions.addNode(type, subType);
+        addNode(type, subType);
       }
     },
-    [screenToFlowPosition, storeActions]
+    [screenToFlowPosition, addNode]
   );
 
   return (
-    <div className="flex h-screen w-screen flex-col bg-background" onKeyDown={handleKeyDown} tabIndex={0}>
+    <div className="flex h-screen w-screen flex-col bg-background" onKeyDown={handleKeyDown} tabIndex={0} role="application" aria-label="Editor de diagramas de arquitetura">
       <header className="flex items-center justify-center gap-3 border-b bg-card/80 px-4 py-2 backdrop-blur-sm">
         <Toolbar
           onAddNode={handleAddNode}
-          onDelete={storeActions.deleteSelected}
+          onDelete={deleteSelected}
           onClearCanvas={() => setShowClearConfirm(true)}
           onUndo={undo}
           onRedo={redo}
           onAutoLayout={(engine, direction) => {
             if (engine === 'elk') {
-              storeActions.autoLayoutELK(direction as any);
+              autoLayoutELK(direction as any).catch(() => {
+                toast({ title: 'Erro ao aplicar layout automático. Tente novamente.', variant: 'destructive' });
+              });
             } else {
-              storeActions.autoLayout(direction as any);
+              autoLayout(direction as any);
             }
           }}
           onExportPNG={handleExportPNG}
@@ -370,12 +368,11 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
           onOpenAIGenerate={() => setShowAIGenerate(true)}
           onOpenAIAnalyze={() => setShowAIAnalysis(true)}
           diagramName={diagramName}
-          onDiagramNameChange={storeActions.setDiagramName}
+          onDiagramNameChange={setDiagramName}
           darkMode={darkMode}
           onToggleDarkMode={toggleDarkMode}
         />
 
-        {/* Épico 7: shared context badges */}
         {shareToken && !diagramId && (
           <Badge variant="outline" className="text-xs">
             Visualizando diagrama compartilhado
@@ -441,22 +438,21 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
 
       <div className="flex-1 relative" ref={reactFlowWrapper}>
         <RecoveryBanner />
-        
+
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={storeActions.onNodesChange}
-          onEdgesChange={storeActions.onEdgesChange}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
           onConnect={handleConnect}
           onNodeDrag={(event, node) => {
             onNodeDrag(event, node);
-            storeActions.onNodeDragHandler(event, node as any);
+            onNodeDragHandler(event, node as any);
           }}
           onNodeDragStop={onNodeDragStop}
           onNodeContextMenu={handleNodeContextMenu}
           onPaneClick={handlePaneClick}
           onNodeClick={handleNodeClick}
-          /* edge double-click protocol selector removed */
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
@@ -511,7 +507,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
             onClose={() => setSelectedNodeId(null)}
           />
         )}
-        
+
       </div>
 
       <StatusBar nodes={nodes} edges={edges} saveStatus={saveStatus} />
@@ -520,8 +516,10 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
         open={showAIGenerate}
         onOpenChange={setShowAIGenerate}
         onGenerate={(newNodes, newEdges) => {
-          storeActions.loadDiagram(newNodes, newEdges);
-          storeActions.autoLayoutELK('LR');
+          loadDiagram(newNodes, newEdges);
+          autoLayoutELK('LR').catch(() => {
+            toast({ title: 'Erro ao aplicar layout automático. Tente novamente.', variant: 'destructive' });
+          });
         }}
       />
 
@@ -545,7 +543,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
         sourceNodeType={spawnSource?.nodeType || ''}
         onConfirm={(type, count, subType) => {
           if (spawnSource) {
-            storeActions.addNodesFromSource(spawnSource.id, type, count, subType);
+            addNodesFromSource(spawnSource.id, type, count, subType);
           }
         }}
       />
@@ -559,7 +557,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={storeActions.clearCanvas}>Limpar</AlertDialogAction>
+            <AlertDialogAction onClick={clearCanvas}>Limpar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -570,13 +568,10 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
         code={mermaidCode || ''}
       />
 
-
       <KeyboardShortcutsModal
         open={showShortcuts}
         onOpenChange={setShowShortcuts}
       />
-
-      {/* Protocol selector kept for manual override if needed */}
     </div>
   );
 }

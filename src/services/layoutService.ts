@@ -1,5 +1,4 @@
 import dagre from 'dagre';
-import ELK from 'elkjs';
 import type { DiagramNode, DiagramEdge } from '@/types/diagram';
 
 const NODE_WIDTH = 180;
@@ -43,9 +42,7 @@ export function getLayoutedElements(
   return { nodes: layoutedNodes, edges };
 }
 
-// ─── ELK Layout ───
-
-const elk = new ELK();
+// ─── ELK Layout (PERF-04: lazy loaded) ───
 
 const ELK_DIRECTION_MAP: Record<LayoutDirection, string> = {
   LR: 'RIGHT',
@@ -54,11 +51,20 @@ const ELK_DIRECTION_MAP: Record<LayoutDirection, string> = {
   BT: 'UP',
 };
 
+// Cache the ELK instance after first load
+let elkInstance: any = null;
+
 export async function getELKLayoutedElements(
   nodes: DiagramNode[],
   edges: DiagramEdge[],
   direction: LayoutDirection = 'LR'
 ): Promise<{ nodes: DiagramNode[]; edges: DiagramEdge[] }> {
+  // PERF-04: Dynamic import — only loads elkjs when first needed
+  if (!elkInstance) {
+    const ELK = (await import('elkjs')).default;
+    elkInstance = new ELK();
+  }
+
   const graph = {
     id: 'root',
     layoutOptions: {
@@ -81,10 +87,10 @@ export async function getELKLayoutedElements(
     })),
   };
 
-  const layouted = await elk.layout(graph);
+  const layouted = await elkInstance.layout(graph);
 
   const layoutedNodes = nodes.map((node) => {
-    const elkNode = layouted.children?.find((n) => n.id === node.id);
+    const elkNode = layouted.children?.find((n: any) => n.id === node.id);
     return {
       ...node,
       position: {

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDiagramStore } from '@/store/diagramStore';
+import { toast } from '@/hooks/use-toast';
 
-const STORAGE_KEY = 'microflow_autosave_v1';
+const STORAGE_KEY = 'microflow_autosave_v2';
+const LEGACY_STORAGE_KEY = 'microflow_autosave_v1';
 const DEBOUNCE_MS = 1500;
 
 export interface AutoSaveData {
@@ -9,10 +11,37 @@ export interface AutoSaveData {
   edges: any[];
   title: string;
   savedAt: string;
-  version: '1';
+  version: '2';
 }
 
 export type SaveStatus = 'idle' | 'saving' | 'saved';
+
+// PERF-06: Compress string using CompressionStream
+async function compressString(input: string): Promise<string> {
+  const blob = new Blob([input]);
+  const stream = blob.stream().pipeThrough(new CompressionStream('gzip'));
+  const compressedBlob = await new Response(stream).blob();
+  const buffer = await compressedBlob.arrayBuffer();
+  // Convert to base64 for localStorage storage
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+// PERF-06: Decompress base64-encoded gzip string
+async function decompressString(base64: string): Promise<string> {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  const blob = new Blob([bytes]);
+  const stream = blob.stream().pipeThrough(new DecompressionStream('gzip'));
+  return await new Response(stream).text();
+}
 
 export function useAutoSave() {
   const nodes = useDiagramStore((s) => s.nodes);
@@ -24,31 +53,39 @@ export function useAutoSave() {
   const isFirstRender = useRef(true);
 
   useEffect(() => {
-    // Skip first render (initial empty state)
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
     }
 
-    // Don't save empty canvas
     if (nodes.length === 0) return;
 
     setSaveStatus('saving');
 
     if (timerRef.current) clearTimeout(timerRef.current);
 
-    timerRef.current = setTimeout(() => {
+    timerRef.current = setTimeout(async () => {
       const data: AutoSaveData = {
         nodes,
         edges,
         title: diagramName,
         savedAt: new Date().toISOString(),
-        version: '1',
+        version: '2',
       };
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        const json = JSON.stringify(data);
+        const compressed = await compressString(json);
+        localStorage.setItem(STORAGE_KEY, compressed);
         setSaveStatus('saved');
-      } catch {
+      } catch (e: any) {
+        // PERF-06: Handle localStorage quota exceeded
+        if (e?.name === 'QuotaExceededError' || e?.code === 22) {
+          toast({
+            title: 'Armazenamento local cheio',
+            description: 'O diagrama é muito grande para salvar localmente. Salve na nuvem para não perder seu trabalho.',
+            variant: 'destructive',
+          });
+        }
         setSaveStatus('idle');
       }
     }, DEBOUNCE_MS);
@@ -61,13 +98,26 @@ export function useAutoSave() {
   return { saveStatus };
 }
 
-export function getAutoSave(): AutoSaveData | null {
+export async function getAutoSave(): Promise<AutoSaveData | null> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw) as AutoSaveData;
-    if (!data.nodes || !data.edges) return null;
-    return data;
+    // Try compressed format (v2) first
+    const compressed = localStorage.getItem(STORAGE_KEY);
+    if (compressed) {
+      const json = await decompressString(compressed);
+      const data = JSON.parse(json) as AutoSaveData;
+      if (!data.nodes || !data.edges) return null;
+      return data;
+    }
+
+    // Fallback: try legacy uncompressed format (v1)
+    const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw) as any;
+      if (!data.nodes || !data.edges) return null;
+      return { ...data, version: '2' } as AutoSaveData;
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -75,4 +125,5 @@ export function getAutoSave(): AutoSaveData | null {
 
 export function clearAutoSave() {
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(LEGACY_STORAGE_KEY);
 }
