@@ -26,7 +26,7 @@ export const NodeSchema = z.object({
     y: z.number(),
   }),
   data: z.object({
-    label: z.string().min(1, 'Label é obrigatório'),
+    label: z.string().min(1, 'Label é obrigatório').max(100, 'Label deve ter no máximo 100 caracteres'),
     type: z.enum(NODE_TYPES),
     subType: z.string().optional(),
     externalCategory: z.enum(EXTERNAL_CATEGORIES).optional(),
