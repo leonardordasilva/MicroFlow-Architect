@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { DiagramNode, DiagramEdge } from '@/types/diagram';
+import { clearAutoSave } from '@/hooks/useAutoSave';
 import { useNavigate } from 'react-router-dom';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,7 +23,6 @@ import { Plus, Trash2, Pencil, ArrowLeft, FileText, Share2, RefreshCw, Loader2, 
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import ShareDiagramModal from '@/components/ShareDiagramModal';
-import { triggerRecoveryBanner } from '@/components/RecoveryBanner';
 
 function DiagramCardSkeleton() {
   return (
@@ -80,8 +80,8 @@ export default function MyDiagrams() {
         store.clearCanvas();
         store.setDiagramName('Novo Diagrama');
         store.setCurrentDiagramId(undefined);
+        clearAutoSave();
       }
-      triggerRecoveryBanner();
       toast({ title: 'Diagrama excluído' });
       setDeleteTarget(null);
     },
