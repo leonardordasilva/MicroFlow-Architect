@@ -15,8 +15,6 @@ function getCorsHeaders(req: Request) {
 }
 
 const MODEL_CASCADE = [
-  "google/gemini-3-flash-preview",
-  "google/gemini-3-pro-preview",
   "google/gemini-2.5-flash",
   "google/gemini-2.5-flash-lite",
 ];
@@ -51,6 +49,43 @@ async function callWithFallback(apiKey: string, messages: { role: string; conten
   return { error: "All AI models unavailable. Try again later.", status: 503 };
 }
 
+// ─── Rate Limiting ───
+const RATE_LIMIT_PER_MINUTE = parseInt(Deno.env.get("AI_RATE_LIMIT_PER_MINUTE") || "10", 10);
+
+async function checkRateLimit(
+  supabaseClient: ReturnType<typeof createClient>,
+  userId: string,
+  functionName: string,
+  corsHeaders: Record<string, string>,
+): Promise<Response | null> {
+  const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
+
+  const { count, error } = await supabaseClient
+    .from("ai_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("function_name", functionName)
+    .gte("created_at", oneMinuteAgo);
+
+  if (error) {
+    console.error("Rate limit check error:", error);
+    return null;
+  }
+
+  if ((count ?? 0) >= RATE_LIMIT_PER_MINUTE) {
+    return new Response(
+      JSON.stringify({ error: "Limite de requisições atingido. Tente novamente em instantes." }),
+      { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  await supabaseClient
+    .from("ai_requests")
+    .insert({ user_id: userId, function_name: functionName });
+
+  return null;
+}
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -76,6 +111,12 @@ serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const userId = (claimsData.claims as Record<string, string>).sub;
+
+    // Rate limiting
+    const rateLimitResponse = await checkRateLimit(supabaseClient, userId, "analyze-diagram", corsHeaders);
+    if (rateLimitResponse) return rateLimitResponse;
 
     const body = await req.json();
     const diagram = body?.diagram;

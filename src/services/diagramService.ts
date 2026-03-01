@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { DiagramNode, DiagramEdge } from '@/types/diagram';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { DbDiagramNodesSchema, DbDiagramEdgesSchema } from '@/schemas/diagramSchema';
 
 // Use Supabase generated type for rows
 type DiagramRow = Tables<'diagrams'>;
@@ -18,11 +19,21 @@ export interface DiagramRecord {
 
 /** Convert a Supabase row into our typed DiagramRecord */
 function toDiagramRecord(row: DiagramRow): DiagramRecord {
+  const nodesParsed = DbDiagramNodesSchema.safeParse(row.nodes ?? []);
+  const edgesParsed = DbDiagramEdgesSchema.safeParse(row.edges ?? []);
+
+  if (!nodesParsed.success) {
+    throw new Error('Dados do diagrama corrompidos no banco de dados. ID: ' + row.id);
+  }
+  if (!edgesParsed.success) {
+    throw new Error('Dados do diagrama corrompidos no banco de dados. ID: ' + row.id);
+  }
+
   return {
     id: row.id,
     title: row.title,
-    nodes: row.nodes as unknown as DiagramNode[],
-    edges: row.edges as unknown as DiagramEdge[],
+    nodes: nodesParsed.data as DiagramNode[],
+    edges: edgesParsed.data as DiagramEdge[],
     owner_id: row.owner_id,
     share_token: row.share_token,
     created_at: row.created_at,

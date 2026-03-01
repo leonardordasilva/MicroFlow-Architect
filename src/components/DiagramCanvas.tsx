@@ -117,6 +117,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [mermaidCode, setMermaidCode] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const lastLoadedUpdatedAtRef = useRef<string | null>(null);
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -218,6 +219,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     (data: { nodes: any[]; edges: any[]; name?: string }) => {
       loadDiagram(data.nodes, data.edges);
       if (data.name) setDiagramName(data.name);
+      lastLoadedUpdatedAtRef.current = null;
       toast({ title: 'Diagrama importado com sucesso!' });
     },
     [loadDiagram, setDiagramName]
@@ -293,23 +295,22 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
         toast({ title: 'Diagrama não encontrado', variant: 'destructive' });
         return;
       }
-      const remoteNodes = JSON.stringify(record.nodes);
-      const remoteEdges = JSON.stringify(record.edges);
-      if (remoteNodes !== JSON.stringify(nodes) || remoteEdges !== JSON.stringify(edges)) {
+      if (record.updated_at === lastLoadedUpdatedAtRef.current) {
+        toast({ title: 'Diagrama já está atualizado.' });
+      } else {
         const temporal = useDiagramStore.temporal.getState();
         temporal.pause();
-        loadDiagram(record.nodes as any, record.edges as any);
+        loadDiagram(record.nodes, record.edges);
         temporal.resume();
+        lastLoadedUpdatedAtRef.current = record.updated_at;
         toast({ title: 'Diagrama atualizado com sucesso!' });
-      } else {
-        toast({ title: 'Diagrama já está atualizado.' });
       }
     } catch {
       toast({ title: 'Erro ao atualizar diagrama', variant: 'destructive' });
     } finally {
       setRefreshing(false);
     }
-  }, [diagramId, nodes, edges, loadDiagram]);
+  }, [diagramId, loadDiagram]);
 
   // Smart node positioning using viewport center
   const handleAddNode = useCallback(

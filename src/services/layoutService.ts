@@ -51,8 +51,9 @@ const ELK_DIRECTION_MAP: Record<LayoutDirection, string> = {
   BT: 'UP',
 };
 
-// Cache the ELK instance after first load
-let elkInstance: any = null;
+// Singleton: ELK is lazily loaded on first use. In Vite HMR, module re-execution
+// will create a new instance (harmless, just an extra import).
+let elkInstance: import('elkjs').ELK | null = null;
 
 export async function getELKLayoutedElements(
   nodes: DiagramNode[],
