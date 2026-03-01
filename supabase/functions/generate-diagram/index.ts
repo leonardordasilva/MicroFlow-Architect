@@ -80,6 +80,15 @@ async function checkRateLimit(
     );
   }
 
+  // Purge stale rate-limit records (> 5 minutes old)
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60_000).toISOString();
+  await supabaseClient
+    .from("ai_requests")
+    .delete()
+    .eq("user_id", userId)
+    .eq("function_name", functionName)
+    .lt("created_at", fiveMinutesAgo);
+
   // Record this request
   await supabaseClient
     .from("ai_requests")

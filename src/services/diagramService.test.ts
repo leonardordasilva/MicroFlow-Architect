@@ -105,6 +105,20 @@ describe('diagramService', () => {
   });
 
   describe('loadDiagramById', () => {
+    it('returns DiagramRecord for a valid row', async () => {
+      const chain = chainable({
+        single: vi.fn().mockResolvedValue({ data: mockRow, error: null }),
+      });
+      vi.mocked(supabase.from).mockReturnValue(chain as never);
+
+      const result = await loadDiagramById('diag-1');
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe('diag-1');
+      expect(result!.title).toBe('Test Diagram');
+      expect(result!.nodes).toEqual([]);
+      expect(result!.edges).toEqual([]);
+    });
+
     it('returns null when Supabase returns error', async () => {
       const chain = chainable({
         single: vi.fn().mockResolvedValue({ data: null, error: new Error('Not found') }),
