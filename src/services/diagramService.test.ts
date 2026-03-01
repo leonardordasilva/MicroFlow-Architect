@@ -42,6 +42,7 @@ vi.mock('@/integrations/supabase/client', () => {
 import { supabase } from '@/integrations/supabase/client';
 import {
   saveDiagram,
+  saveSharedDiagram,
   loadDiagramById,
   deleteDiagram,
   renameDiagram,
@@ -101,6 +102,21 @@ describe('diagramService', () => {
       vi.mocked(supabase.from).mockReturnValue(chain as never);
 
       await expect(saveDiagram('Test', [], [], 'user-1')).rejects.toThrow();
+    });
+  });
+
+  describe('saveSharedDiagram', () => {
+    it('não filtra por owner_id — proteção delegada ao RLS (contrato de segurança)', async () => {
+      const chain = chainable();
+      vi.mocked(supabase.from).mockReturnValue(chain as never);
+
+      await expect(
+        saveSharedDiagram('diag-1', [], [])
+      ).resolves.not.toThrow();
+
+      const eqCalls = (chain.eq as ReturnType<typeof vi.fn>).mock.calls;
+      const ownerIdCall = eqCalls.find((args: unknown[]) => args[0] === 'owner_id');
+      expect(ownerIdCall).toBeUndefined();
     });
   });
 

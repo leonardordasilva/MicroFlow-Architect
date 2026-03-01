@@ -36,9 +36,13 @@ async function compressString(input: string): Promise<string> {
     merged.set(chunk, offset);
     offset += chunk.length;
   }
+  const CHUNK = 8192;
   let binary = '';
-  for (let i = 0; i < merged.length; i++) {
-    binary += String.fromCharCode(merged[i]);
+  for (let i = 0; i < merged.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(
+      null,
+      Array.from(merged.subarray(i, i + CHUNK))
+    );
   }
   return btoa(binary);
 }

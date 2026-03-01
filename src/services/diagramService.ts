@@ -29,13 +29,14 @@ function toDiagramRecord(row: DiagramRow): DiagramRecord {
     throw new Error('Dados do diagrama corrompidos no banco de dados. ID: ' + row.id);
   }
 
-  // Zod .passthrough() makes output keys structurally optional; after successful
-  // validation we know id/source/target etc. exist, so the cast is safe.
+  // Fronteira persistência→runtime: PersistedNode é structurally compatible
+  // com DiagramNode, salvo pelas propriedades de runtime do React Flow
+  // (selected, dragging, measured etc.) que são inicializadas como undefined.
   return {
     id: row.id,
     title: row.title,
-    nodes: nodesParsed.data as unknown as DiagramNode[],
-    edges: edgesParsed.data as unknown as DiagramEdge[],
+    nodes: nodesParsed.data as DiagramNode[],
+    edges: edgesParsed.data as DiagramEdge[],
     owner_id: row.owner_id,
     share_token: row.share_token,
     created_at: row.created_at,
@@ -132,6 +133,19 @@ export async function deleteDiagram(id: string, ownerId: string): Promise<void> 
   if (error) throw error;
 }
 
+/**
+ * Salva alterações em um diagrama compartilhado.
+ *
+ * CONTRATO DE SEGURANÇA: esta função NÃO verifica owner_id no lado
+ * cliente intencionalmente. A autorização é delegada inteiramente
+ * à política RLS da tabela `diagrams` no Supabase, que deve garantir
+ * que somente colaboradores autorizados possam executar UPDATE.
+ *
+ * Política RLS esperada (tabela diagrams, operação UPDATE):
+ *   auth.uid() = owner_id  OR  share_token IS NOT NULL
+ *
+ * Nunca remova esta nota sem auditar as políticas RLS primeiro.
+ */
 export async function saveSharedDiagram(
   diagramId: string,
   nodes: DiagramNode[],
