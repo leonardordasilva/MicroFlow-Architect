@@ -1,5 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { DiagramNode, DiagramEdge } from '@/types/diagram';
+import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+
+// Use Supabase generated type for rows
+type DiagramRow = Tables<'diagrams'>;
 
 export interface DiagramRecord {
   id: string;
@@ -12,6 +16,20 @@ export interface DiagramRecord {
   updated_at: string;
 }
 
+/** Convert a Supabase row into our typed DiagramRecord */
+function toDiagramRecord(row: DiagramRow): DiagramRecord {
+  return {
+    id: row.id,
+    title: row.title,
+    nodes: row.nodes as unknown as DiagramNode[],
+    edges: row.edges as unknown as DiagramEdge[],
+    owner_id: row.owner_id,
+    share_token: row.share_token,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
 export async function saveDiagram(
   title: string,
   nodes: DiagramNode[],
@@ -20,41 +38,43 @@ export async function saveDiagram(
   existingId?: string,
 ): Promise<DiagramRecord> {
   if (existingId) {
+    const updatePayload: TablesUpdate<'diagrams'> = {
+      title,
+      nodes: JSON.parse(JSON.stringify(nodes)),
+      edges: JSON.parse(JSON.stringify(edges)),
+      updated_at: new Date().toISOString(),
+    };
     const { data, error } = await supabase
       .from('diagrams')
-      .update({
-        title,
-        nodes: nodes as any,
-        edges: edges as any,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', existingId)
       .eq('owner_id', ownerId)
       .select()
       .single();
     if (error) throw error;
-    return data as unknown as DiagramRecord;
+    return toDiagramRecord(data);
   }
 
+  const insertPayload: TablesInsert<'diagrams'> = {
+    title,
+    nodes: JSON.parse(JSON.stringify(nodes)),
+    edges: JSON.parse(JSON.stringify(edges)),
+    owner_id: ownerId,
+  };
   const { data, error } = await supabase
     .from('diagrams')
-    .insert({
-      title,
-      nodes: nodes as any,
-      edges: edges as any,
-      owner_id: ownerId,
-    })
+    .insert(insertPayload)
     .select()
     .single();
   if (error) throw error;
-  return data as unknown as DiagramRecord;
+  return toDiagramRecord(data);
 }
 
 export async function loadDiagramByToken(shareToken: string): Promise<DiagramRecord | null> {
   const { data, error } = await supabase
     .rpc('get_diagram_by_share_token', { token: shareToken });
   if (error || !data || data.length === 0) return null;
-  return data[0] as unknown as DiagramRecord;
+  return toDiagramRecord(data[0] as DiagramRow);
 }
 
 const PAGE_SIZE = 12;
@@ -64,7 +84,7 @@ export async function loadUserDiagrams(
   page = 0,
 ): Promise<{ diagrams: DiagramRecord[]; hasMore: boolean }> {
   const from = page * PAGE_SIZE;
-  const to = from + PAGE_SIZE; // fetch 1 extra to detect hasMore
+  const to = from + PAGE_SIZE;
   const { data, error } = await supabase
     .from('diagrams')
     .select('*')
@@ -72,7 +92,7 @@ export async function loadUserDiagrams(
     .order('updated_at', { ascending: false })
     .range(from, to);
   if (error) return { diagrams: [], hasMore: false };
-  const rows = (data || []) as unknown as DiagramRecord[];
+  const rows = (data || []).map(toDiagramRecord);
   const hasMore = rows.length > PAGE_SIZE;
   return { diagrams: hasMore ? rows.slice(0, PAGE_SIZE) : rows, hasMore };
 }
@@ -84,7 +104,7 @@ export async function loadDiagramById(id: string): Promise<DiagramRecord | null>
     .eq('id', id)
     .single();
   if (error) return null;
-  return data as unknown as DiagramRecord;
+  return toDiagramRecord(data);
 }
 
 export async function deleteDiagram(id: string, ownerId: string): Promise<void> {
@@ -97,13 +117,14 @@ export async function saveSharedDiagram(
   nodes: DiagramNode[],
   edges: DiagramEdge[],
 ): Promise<void> {
+  const updatePayload: TablesUpdate<'diagrams'> = {
+    nodes: JSON.parse(JSON.stringify(nodes)),
+    edges: JSON.parse(JSON.stringify(edges)),
+    updated_at: new Date().toISOString(),
+  };
   const { error } = await supabase
     .from('diagrams')
-    .update({
-      nodes: nodes as any,
-      edges: edges as any,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq('id', diagramId);
 
   if (error) {
@@ -116,9 +137,13 @@ export async function renameDiagram(id: string, title: string, ownerId: string):
   if (!trimmed || trimmed.length > 100) {
     throw new Error('Título inválido: deve ter entre 1 e 100 caracteres');
   }
+  const updatePayload: TablesUpdate<'diagrams'> = {
+    title: trimmed,
+    updated_at: new Date().toISOString(),
+  };
   const { error } = await supabase
     .from('diagrams')
-    .update({ title: trimmed, updated_at: new Date().toISOString() })
+    .update(updatePayload)
     .eq('id', id)
     .eq('owner_id', ownerId);
   if (error) throw error;

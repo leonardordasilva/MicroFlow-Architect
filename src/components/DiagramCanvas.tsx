@@ -39,7 +39,8 @@ import { exportToMermaid } from '@/services/exportService';
 import MermaidExportModal from '@/components/MermaidExportModal';
 
 import { useAuth } from '@/hooks/useAuth';
-import { saveDiagram, saveSharedDiagram, loadDiagramById } from '@/services/diagramService';
+import { loadDiagramById } from '@/services/diagramService';
+import { useSaveDiagram } from '@/hooks/useSaveDiagram';
 import { useRealtimeCollab } from '@/hooks/useRealtimeCollab';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import RecoveryBanner from '@/components/RecoveryBanner';
@@ -99,6 +100,9 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
   const redo = useCallback(() => useDiagramStore.temporal.getState().redo(), []);
 
   const { user, signOut } = useAuth();
+  // QUA-04: Save logic extracted to custom hook
+  const { save: handleSaveToCloud, saving, saveRef: handleSaveToCloudRef } = useSaveDiagram({ shareToken });
+
   const [darkMode, setDarkMode] = useState(false);
   const [showAIGenerate, setShowAIGenerate] = useState(false);
   const [showAIAnalysis, setShowAIAnalysis] = useState(false);
@@ -107,8 +111,6 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string; nodeLabel: string } | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [mermaidCode, setMermaidCode] = useState<string | null>(null);
-
-  const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -197,42 +199,6 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     },
     [loadDiagram, setDiagramName]
   );
-
-  // PERF-05: Use ref for handleSaveToCloud to avoid closure stale in handleKeyDown
-  const handleSaveToCloudRef = useRef<() => void>(() => {});
-
-  const handleSaveToCloud = useCallback(async () => {
-    if (!user) return;
-    setSaving(true);
-    try {
-      if (isCollaborator && diagramId) {
-        await saveSharedDiagram(diagramId, nodes, edges);
-        toast({ title: 'Alterações salvas no diagrama compartilhado!' });
-      } else {
-        const isSharedContext = !!shareToken && !diagramId;
-        const record = await saveDiagram(diagramName, nodes, edges, user.id, diagramId);
-        setDiagramId(record.id);
-        if (isSharedContext) {
-          toast({
-            title: 'Diagrama salvo como cópia!',
-            description: 'Uma cópia deste diagrama foi salva em "Meus Diagramas". Você não está editando o diagrama original.',
-            duration: 6000,
-          });
-        } else {
-          toast({ title: 'Diagrama salvo na nuvem!' });
-        }
-      }
-    } catch (err: any) {
-      toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' });
-    } finally {
-      setSaving(false);
-    }
-  }, [user, diagramName, nodes, edges, diagramId, shareToken, isCollaborator, setDiagramId]);
-
-  // Keep ref always up-to-date
-  useEffect(() => {
-    handleSaveToCloudRef.current = handleSaveToCloud;
-  }, [handleSaveToCloud]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
