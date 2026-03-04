@@ -1,6 +1,6 @@
 import { memo, useState, useEffect } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Box, Database, Server } from 'lucide-react';
+import { Box, Database, Server, Library } from 'lucide-react';
 import type { DiagramNodeData } from '@/types/diagram';
 import { normalizeInternalDb } from '@/types/diagram';
 import { useDiagramStore } from '@/store/diagramStore';
@@ -134,7 +134,7 @@ const ServiceNode = memo(({ data, id, selected }: NodeProps) => {
         <div className="mt-2 space-y-1">
           {nodeData.internalServices.map((svc, i) => (
             <div key={i} className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Server className="h-3 w-3 text-[hsl(var(--node-service))]" />
+              <Library className="h-3 w-3 text-[hsl(var(--node-service))]" />
               <EditableDbItem value={svc} onChange={(v) => handleSvcRename(i, v)} />
             </div>
           ))}

@@ -83,7 +83,7 @@ export default function NodePropertiesPanel({ nodeId, onClose }: NodePropertiesP
   };
 
   const addSvc = () => {
-    const updated = [...internalSvcs, `Microserviço ${internalSvcs.length + 1}`];
+    const updated = [...internalSvcs, `Biblioteca ${internalSvcs.length + 1}`];
     setInternalSvcs(updated);
     updateNode({ internalServices: updated });
   };
@@ -186,7 +186,7 @@ export default function NodePropertiesPanel({ nodeId, onClose }: NodePropertiesP
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-xs">Serviços Internos</Label>
+                <Label className="text-xs">Bibliotecas</Label>
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={addSvc} aria-label="Adicionar serviço">
                   <Plus className="h-3.5 w-3.5" />
                 </Button>

@@ -63,7 +63,12 @@ export default function SpawnFromNodeModal({
   const handleConfirm = () => {
     if (count < 1) return;
     const needsSubType = effectiveType === 'database' || effectiveType === 'queue' || effectiveType === 'external';
-    onConfirm(effectiveType, count, needsSubType ? subType : undefined);
+    // Pass 'library' as subType when type is 'library' (pseudo-type for embedding)
+    if (type === 'library' as any) {
+      onConfirm('service', count, 'library');
+    } else {
+      onConfirm(effectiveType, count, needsSubType ? subType : undefined);
+    }
     onOpenChange(false);
     setCount(1);
   };
@@ -95,6 +100,7 @@ export default function SpawnFromNodeModal({
                 </SelectTrigger>
                 <SelectContent className="z-50">
                   <SelectItem value="service">Microserviço</SelectItem>
+                  {isService && <SelectItem value="library">Biblioteca</SelectItem>}
                   <SelectItem value="database">Banco de Dados</SelectItem>
                   <SelectItem value="queue">Fila (IBM MQ/Kafka/RabbitMQ)</SelectItem>
                   <SelectItem value="external">API (REST/gRPC/GraphQL/WS/HTTPS)</SelectItem>
@@ -155,13 +161,13 @@ export default function SpawnFromNodeModal({
           {/* Alert de embedding ou conexão manual */}
           {(() => {
             const isEmbeddingOracle = isService && effectiveType === 'database' && subType === 'Oracle';
-            const isEmbeddingService = isService && effectiveType === 'service';
-            const isEmbedding = isEmbeddingOracle || isEmbeddingService;
+            const isEmbeddingLibrary = isService && type === ('library' as any);
+            const isEmbedding = isEmbeddingOracle || isEmbeddingLibrary;
 
             if (isEmbedding) {
               const embeddingMessage = isEmbeddingOracle
                 ? `O Oracle será adicionado como banco interno do nó "${sourceNodeLabel}". Nenhum nó separado será criado no canvas.`
-                : `O microserviço será adicionado como serviço interno do nó "${sourceNodeLabel}". Nenhum nó separado será criado no canvas.`;
+                : `A biblioteca será adicionada como componente interno do nó "${sourceNodeLabel}". Nenhum nó separado será criado no canvas.`;
               return (
                 <Alert className="border-blue-500/30 bg-blue-500/5">
                   <Info className="h-4 w-4 text-blue-500" />
