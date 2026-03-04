@@ -108,12 +108,13 @@ export const useDiagramStore = create<DiagramStore>()(
         const sourceNode = nodes.find((n) => n.id === connection.source);
         const sourceType = sourceNode?.type as NodeType | undefined;
         const sourceSubType = (sourceNode?.data as DiagramNodeData | undefined)?.subType;
+        const isQueue = sourceType === 'queue';
         set((state) => ({
           edges: addEdge(
             {
               ...connection,
               type: 'editable',
-              animated: true,
+              animated: false,
               style: { strokeWidth: 2 },
               markerEnd: { type: MarkerType.ArrowClosed, color: getNodeColor(sourceType, sourceSubType) },
               data: { waypoints: undefined, sourceNodeType: sourceType, sourceNodeSubType: sourceSubType },
