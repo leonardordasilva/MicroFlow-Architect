@@ -157,12 +157,12 @@ export const useDiagramStore = create<DiagramStore>()(
           return;
         }
 
-        // Embed microservice inside service
-        if (type === 'service' && sourceNode.type === 'service') {
+        // Embed library inside service (triggered by subType === 'library')
+        if (type === 'service' && subType === 'library' && sourceNode.type === 'service') {
           const currentSvcs = sourceData.internalServices || [];
           const newSvcs = [...currentSvcs];
           for (let i = 0; i < count; i++) {
-            newSvcs.push(`Microserviço ${currentSvcs.length + i + 1}`);
+            newSvcs.push(`Biblioteca ${currentSvcs.length + i + 1}`);
           }
           set((state) => ({
             nodes: state.nodes.map((n) =>
