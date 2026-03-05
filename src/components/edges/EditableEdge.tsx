@@ -190,33 +190,22 @@ export default function EditableEdge({
                 edge.id === id ? { ...edge, data: { ...edge.data, midOffsetX: newMidX } } : edge
               )
             );
+          } else if (currentRole === 'sourceY') {
+            const dy = svgPt.y - draggingRef.current.startSvg.y;
+            const newSourceY = draggingRef.current.initialOffsetSourceY + dy;
+            setEdges((edges) =>
+              edges.map((edge) =>
+                edge.id === id ? { ...edge, data: { ...edge.data, sourceOffsetY: newSourceY } } : edge
+              )
+            );
           } else {
             const dy = svgPt.y - draggingRef.current.startSvg.y;
-            // If sourceOffsetY and targetOffsetY are aligned, move both together
-            const aligned = Math.abs(draggingRef.current.initialOffsetSourceY - draggingRef.current.initialOffsetTargetY) < 2;
-            if (aligned) {
-              const newSourceY = draggingRef.current.initialOffsetSourceY + dy;
-              const newTargetY = draggingRef.current.initialOffsetTargetY + dy;
-              setEdges((edges) =>
-                edges.map((edge) =>
-                  edge.id === id ? { ...edge, data: { ...edge.data, sourceOffsetY: newSourceY, targetOffsetY: newTargetY } } : edge
-                )
-              );
-            } else if (currentRole === 'sourceY') {
-              const newSourceY = draggingRef.current.initialOffsetSourceY + dy;
-              setEdges((edges) =>
-                edges.map((edge) =>
-                  edge.id === id ? { ...edge, data: { ...edge.data, sourceOffsetY: newSourceY } } : edge
-                )
-              );
-            } else {
-              const newTargetY = draggingRef.current.initialOffsetTargetY + dy;
-              setEdges((edges) =>
-                edges.map((edge) =>
-                  edge.id === id ? { ...edge, data: { ...edge.data, targetOffsetY: newTargetY } } : edge
-                )
-              );
-            }
+            const newTargetY = draggingRef.current.initialOffsetTargetY + dy;
+            setEdges((edges) =>
+              edges.map((edge) =>
+                edge.id === id ? { ...edge, data: { ...edge.data, targetOffsetY: newTargetY } } : edge
+              )
+            );
           }
         };
 
