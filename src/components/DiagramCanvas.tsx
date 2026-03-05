@@ -46,7 +46,7 @@ import { useRealtimeCollab } from '@/hooks/useRealtimeCollab';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import RecoveryBanner from '@/components/RecoveryBanner';
 import { canConnect, connectionErrorMessage } from '@/utils/connectionRules';
-import { Loader2, Save, LogOut, Keyboard, FolderOpen, RefreshCw } from 'lucide-react';
+import { Loader2, Save, LogOut, Keyboard, FolderOpen, RefreshCw, Hand, MousePointer2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -122,6 +122,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [interactionMode, setInteractionMode] = useState<'pan' | 'select'>('pan');
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { guides, onNodeDrag, onNodeDragStop } = useSnapGuides(nodes);
@@ -449,8 +450,8 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
           fitView
           snapToGrid
           snapGrid={[10, 10]}
-          selectionOnDrag
-          panOnDrag={[1, 2]}
+          selectionOnDrag={interactionMode === 'select'}
+          panOnDrag={interactionMode === 'select' ? [1, 2] : [0, 1, 2]}
           selectionMode={SelectionMode.Partial}
           defaultEdgeOptions={{
             type: 'editable',
@@ -463,6 +464,38 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
           <SnapGuideLines guides={guides} />
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
           <Controls className="!bg-card !border-border !shadow-md [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-foreground" />
+
+          {/* Pan / Select mode toggle */}
+          <div className="absolute top-3 left-3 z-10 flex gap-1 rounded-lg border bg-card p-1 shadow-md">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={interactionMode === 'pan' ? 'default' : 'ghost'}
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setInteractionMode('pan')}
+                  aria-label="Mover canvas"
+                >
+                  <Hand className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Mover canvas (arrastar)</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={interactionMode === 'select' ? 'default' : 'ghost'}
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setInteractionMode('select')}
+                  aria-label="Selecionar objetos"
+                >
+                  <MousePointer2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Selecionar objetos (arrastar)</TooltipContent>
+            </Tooltip>
+          </div>
           <MiniMap
             className="!bg-card !border-border"
             nodeColor={(node) => {
