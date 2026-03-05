@@ -52,7 +52,7 @@ function isVerticalSegment(a: Point, b: Point): boolean {
 }
 
 type DragAxis = 'x' | 'y';
-type OffsetKey = 'midOffsetX' | 'sourceOffsetY' | 'targetOffsetY';
+type SegmentRole = 'midX' | 'sourceY' | 'targetY';
 
 export default function EditableEdge({
   id,
@@ -145,7 +145,7 @@ export default function EditableEdge({
   const labelY2 = (allPoints[midIdx - 1].y + allPoints[midIdx].y) / 2;
 
   const handleSegmentPointerDown = useCallback(
-    (axis: DragAxis) =>
+    (role: SegmentRole) =>
       (evt: React.PointerEvent) => {
         evt.preventDefault();
         evt.stopPropagation();
@@ -166,9 +166,11 @@ export default function EditableEdge({
           initialOffsetSourceY: sourceOffsetY,
           initialOffsetTargetY: targetOffsetY,
           initialOffsetMidX: midOffsetX,
-          axis,
-          mode: axis === 'x' ? 'horizontal' : 'vertical',
+          axis: role === 'midX' ? 'x' : 'y',
+          mode: role === 'midX' ? 'horizontal' : 'vertical',
         };
+
+        const currentRole = role;
 
         const onMove = (e: PointerEvent) => {
           if (!draggingRef.current) return;
@@ -180,8 +182,7 @@ export default function EditableEdge({
           if (!currentCtm) return;
           const svgPt = pt.matrixTransform(currentCtm);
 
-          if (draggingRef.current.axis === 'x') {
-            // Dragging vertical segment horizontally → move midOffsetX
+          if (currentRole === 'midX') {
             const dx = svgPt.x - draggingRef.current.startSvg.x;
             const newMidX = draggingRef.current.initialOffsetMidX + dx;
             setEdges((edges) =>
@@ -189,14 +190,20 @@ export default function EditableEdge({
                 edge.id === id ? { ...edge, data: { ...edge.data, midOffsetX: newMidX } } : edge
               )
             );
-          } else {
-            // Dragging horizontal segment vertically → move BOTH sourceOffsetY and targetOffsetY together
+          } else if (currentRole === 'sourceY') {
             const dy = svgPt.y - draggingRef.current.startSvg.y;
             const newSourceY = draggingRef.current.initialOffsetSourceY + dy;
+            setEdges((edges) =>
+              edges.map((edge) =>
+                edge.id === id ? { ...edge, data: { ...edge.data, sourceOffsetY: newSourceY } } : edge
+              )
+            );
+          } else if (currentRole === 'targetY') {
+            const dy = svgPt.y - draggingRef.current.startSvg.y;
             const newTargetY = draggingRef.current.initialOffsetTargetY + dy;
             setEdges((edges) =>
               edges.map((edge) =>
-                edge.id === id ? { ...edge, data: { ...edge.data, sourceOffsetY: newSourceY, targetOffsetY: newTargetY } } : edge
+                edge.id === id ? { ...edge, data: { ...edge.data, targetOffsetY: newTargetY } } : edge
               )
             );
           }
@@ -223,7 +230,15 @@ export default function EditableEdge({
     if (segLen < 2) continue;
 
     const vertical = isVerticalSegment(a, b);
-    const axis: DragAxis = vertical ? 'x' : 'y';
+    // Determine role: vertical segments move midX; horizontal segments near source move sourceY, near target move targetY
+    let role: SegmentRole;
+    if (vertical) {
+      role = 'midX';
+    } else {
+      // If segment center is closer to source, it's sourceY; otherwise targetY
+      const segCenterX = (a.x + b.x) / 2;
+      role = Math.abs(segCenterX - sourceX) < Math.abs(segCenterX - targetX) ? 'sourceY' : 'targetY';
+    }
     const cursor = vertical ? 'ew-resize' : 'ns-resize';
 
     segments.push(
@@ -234,7 +249,7 @@ export default function EditableEdge({
         stroke="transparent"
         strokeWidth={16}
         style={{ cursor }}
-        onPointerDown={handleSegmentPointerDown(axis)}
+        onPointerDown={handleSegmentPointerDown(role)}
       />
     );
   }
