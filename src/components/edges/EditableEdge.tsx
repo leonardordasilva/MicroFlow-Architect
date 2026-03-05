@@ -70,9 +70,11 @@ export default function EditableEdge({
   const { setEdges } = useReactFlow();
   const draggingRef = useRef<{
     startSvg: Point;
-    initialOffset: number;
+    initialOffsetSourceY: number;
+    initialOffsetTargetY: number;
+    initialOffsetMidX: number;
     axis: DragAxis;
-    offsetKey: OffsetKey;
+    mode: 'horizontal' | 'vertical';
   } | null>(null);
 
   const edgeData = data as EditableEdgeData | undefined;
@@ -142,25 +144,8 @@ export default function EditableEdge({
   const labelX = (allPoints[midIdx - 1].x + allPoints[midIdx].x) / 2;
   const labelY2 = (allPoints[midIdx - 1].y + allPoints[midIdx].y) / 2;
 
-  // Determine which offset key a segment controls
-  function getSegmentInfo(segIdx: number, a: Point, b: Point): { axis: DragAxis; offsetKey: OffsetKey; cursor: string } | null {
-    const vertical = isVerticalSegment(a, b);
-    if (vertical) {
-      // Vertical segment → drag horizontally → midOffsetX
-      return { axis: 'x', offsetKey: 'midOffsetX', cursor: 'ew-resize' };
-    } else {
-      // Horizontal segment → drag vertically
-      // Determine if closer to source or target by Y position
-      const midY = (a.y + b.y) / 2;
-      const distToSource = Math.abs(midY - sourceY);
-      const distToTarget = Math.abs(midY - targetY);
-      const offsetKey: OffsetKey = distToSource < distToTarget ? 'sourceOffsetY' : 'targetOffsetY';
-      return { axis: 'y', offsetKey, cursor: 'ns-resize' };
-    }
-  }
-
   const handleSegmentPointerDown = useCallback(
-    (axis: DragAxis, offsetKey: OffsetKey, initialVal: number) =>
+    (axis: DragAxis) =>
       (evt: React.PointerEvent) => {
         evt.preventDefault();
         evt.stopPropagation();
@@ -178,9 +163,11 @@ export default function EditableEdge({
 
         draggingRef.current = {
           startSvg: { x: startSvg.x, y: startSvg.y },
-          initialOffset: initialVal,
+          initialOffsetSourceY: sourceOffsetY,
+          initialOffsetTargetY: targetOffsetY,
+          initialOffsetMidX: midOffsetX,
           axis,
-          offsetKey,
+          mode: axis === 'x' ? 'horizontal' : 'vertical',
         };
 
         const onMove = (e: PointerEvent) => {
@@ -193,17 +180,26 @@ export default function EditableEdge({
           if (!currentCtm) return;
           const svgPt = pt.matrixTransform(currentCtm);
 
-          const delta = draggingRef.current.axis === 'x'
-            ? svgPt.x - draggingRef.current.startSvg.x
-            : svgPt.y - draggingRef.current.startSvg.y;
-          const newOffset = draggingRef.current.initialOffset + delta;
-          const key = draggingRef.current.offsetKey;
-
-          setEdges((edges) =>
-            edges.map((edge) =>
-              edge.id === id ? { ...edge, data: { ...edge.data, [key]: newOffset } } : edge
-            )
-          );
+          if (draggingRef.current.axis === 'x') {
+            // Dragging vertical segment horizontally → move midOffsetX
+            const dx = svgPt.x - draggingRef.current.startSvg.x;
+            const newMidX = draggingRef.current.initialOffsetMidX + dx;
+            setEdges((edges) =>
+              edges.map((edge) =>
+                edge.id === id ? { ...edge, data: { ...edge.data, midOffsetX: newMidX } } : edge
+              )
+            );
+          } else {
+            // Dragging horizontal segment vertically → move BOTH sourceOffsetY and targetOffsetY together
+            const dy = svgPt.y - draggingRef.current.startSvg.y;
+            const newSourceY = draggingRef.current.initialOffsetSourceY + dy;
+            const newTargetY = draggingRef.current.initialOffsetTargetY + dy;
+            setEdges((edges) =>
+              edges.map((edge) =>
+                edge.id === id ? { ...edge, data: { ...edge.data, sourceOffsetY: newSourceY, targetOffsetY: newTargetY } } : edge
+              )
+            );
+          }
         };
 
         const onUp = () => {
@@ -215,7 +211,7 @@ export default function EditableEdge({
         document.addEventListener('pointermove', onMove);
         document.addEventListener('pointerup', onUp);
       },
-    [id, setEdges]
+    [id, setEdges, sourceOffsetY, targetOffsetY, midOffsetX]
   );
 
   // Build per-segment hit areas
@@ -226,12 +222,9 @@ export default function EditableEdge({
     const segLen = Math.hypot(b.x - a.x, b.y - a.y);
     if (segLen < 2) continue;
 
-    const info = getSegmentInfo(i, a, b);
-    if (!info) continue;
-
-    const currentVal = info.offsetKey === 'midOffsetX' ? midOffsetX
-      : info.offsetKey === 'sourceOffsetY' ? sourceOffsetY
-      : targetOffsetY;
+    const vertical = isVerticalSegment(a, b);
+    const axis: DragAxis = vertical ? 'x' : 'y';
+    const cursor = vertical ? 'ew-resize' : 'ns-resize';
 
     segments.push(
       <path
@@ -240,8 +233,8 @@ export default function EditableEdge({
         fill="none"
         stroke="transparent"
         strokeWidth={16}
-        style={{ cursor: info.cursor }}
-        onPointerDown={handleSegmentPointerDown(info.axis, info.offsetKey, currentVal)}
+        style={{ cursor }}
+        onPointerDown={handleSegmentPointerDown(axis)}
       />
     );
   }
