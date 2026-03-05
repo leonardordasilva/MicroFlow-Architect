@@ -16,6 +16,7 @@ import {
   Controls,
   MiniMap,
   BackgroundVariant,
+  SelectionMode,
   useReactFlow,
 } from '@xyflow/react';
 import { useSnapGuides } from '@/hooks/useSnapGuides';
@@ -448,6 +449,9 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
           fitView
           snapToGrid
           snapGrid={[10, 10]}
+          selectionOnDrag
+          panOnDrag={[1, 2]}
+          selectionMode={SelectionMode.Partial}
           defaultEdgeOptions={{
             type: 'editable',
             animated: true,
