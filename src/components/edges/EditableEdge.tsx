@@ -190,22 +190,37 @@ export default function EditableEdge({
                 edge.id === id ? { ...edge, data: { ...edge.data, midOffsetX: newMidX } } : edge
               )
             );
-          } else if (currentRole === 'sourceY') {
-            const dy = svgPt.y - draggingRef.current.startSvg.y;
-            const newSourceY = draggingRef.current.initialOffsetSourceY + dy;
-            setEdges((edges) =>
-              edges.map((edge) =>
-                edge.id === id ? { ...edge, data: { ...edge.data, sourceOffsetY: newSourceY } } : edge
-              )
-            );
           } else {
             const dy = svgPt.y - draggingRef.current.startSvg.y;
-            const newTargetY = draggingRef.current.initialOffsetTargetY + dy;
-            setEdges((edges) =>
-              edges.map((edge) =>
-                edge.id === id ? { ...edge, data: { ...edge.data, targetOffsetY: newTargetY } } : edge
-              )
-            );
+            const SNAP_THRESHOLD = 8;
+
+            if (currentRole === 'sourceY') {
+              const newSourceY = draggingRef.current.initialOffsetSourceY + dy;
+              // Get current targetOffsetY from the edge
+              setEdges((edges) =>
+                edges.map((edge) => {
+                  if (edge.id !== id) return edge;
+                  const curTargetY = (edge.data as any)?.targetOffsetY ?? 0;
+                  // If close to target, snap both to same value
+                  if (Math.abs(newSourceY - curTargetY) < SNAP_THRESHOLD) {
+                    return { ...edge, data: { ...edge.data, sourceOffsetY: curTargetY, targetOffsetY: curTargetY } };
+                  }
+                  return { ...edge, data: { ...edge.data, sourceOffsetY: newSourceY } };
+                })
+              );
+            } else {
+              const newTargetY = draggingRef.current.initialOffsetTargetY + dy;
+              setEdges((edges) =>
+                edges.map((edge) => {
+                  if (edge.id !== id) return edge;
+                  const curSourceY = (edge.data as any)?.sourceOffsetY ?? 0;
+                  if (Math.abs(newTargetY - curSourceY) < SNAP_THRESHOLD) {
+                    return { ...edge, data: { ...edge.data, sourceOffsetY: curSourceY, targetOffsetY: curSourceY } };
+                  }
+                  return { ...edge, data: { ...edge.data, targetOffsetY: newTargetY } };
+                })
+              );
+            }
           }
         };
 
