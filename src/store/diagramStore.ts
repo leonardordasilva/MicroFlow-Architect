@@ -89,18 +89,20 @@ export const useDiagramStore = create<DiagramStore>()(
 
       // React Flow handlers - avoid unnecessary updates to prevent infinite loops
       onNodesChange: (changes) => {
-        if (changes.length === 0) return;
+        if (!changes || changes.length === 0) return;
         const { nodes } = get();
+        if (!Array.isArray(nodes)) { set({ nodes: [] }); return; }
         const updated = applyNodeChanges(changes, nodes) as DiagramNode[];
         // Only update if reference actually changed (avoid render loop)
-        if (updated !== nodes) set({ nodes: updated });
+        if (updated !== nodes) set({ nodes: Array.isArray(updated) ? updated : [] });
       },
 
       onEdgesChange: (changes) => {
-        if (changes.length === 0) return;
+        if (!changes || changes.length === 0) return;
         const { edges } = get();
+        if (!Array.isArray(edges)) { set({ edges: [] }); return; }
         const updated = applyEdgeChanges(changes, edges) as DiagramEdge[];
-        if (updated !== edges) set({ edges: updated });
+        if (updated !== edges) set({ edges: Array.isArray(updated) ? updated : [] });
       },
 
       onConnect: (connection) => {
@@ -246,7 +248,7 @@ export const useDiagramStore = create<DiagramStore>()(
 
       clearCanvas: () => set({ nodes: [], edges: [], isCollaborator: false }),
 
-      loadDiagram: (nodes, edges) => set({ nodes, edges, isCollaborator: false }),
+      loadDiagram: (nodes, edges) => set({ nodes: Array.isArray(nodes) ? nodes : [], edges: Array.isArray(edges) ? edges : [], isCollaborator: false }),
 
       exportJSON: () => {
         const { diagramName, nodes, edges } = get();

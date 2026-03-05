@@ -45,6 +45,7 @@ import { useSaveDiagram } from '@/hooks/useSaveDiagram';
 import { useRealtimeCollab } from '@/hooks/useRealtimeCollab';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import RecoveryBanner from '@/components/RecoveryBanner';
+import DiagramErrorBoundary from '@/components/DiagramErrorBoundary';
 import { canConnect, connectionErrorMessage } from '@/utils/connectionRules';
 import { Loader2, Save, LogOut, Keyboard, FolderOpen, RefreshCw, Hand, MousePointer2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -74,8 +75,8 @@ interface DiagramCanvasProps {
 
 function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
   const navigate = useNavigate();
-  const nodes = useDiagramStore((s) => s.nodes);
-  const edges = useDiagramStore((s) => s.edges);
+  const nodes = useDiagramStore((s) => Array.isArray(s.nodes) ? s.nodes : []);
+  const edges = useDiagramStore((s) => Array.isArray(s.edges) ? s.edges : []);
   const diagramName = useDiagramStore((s) => s.diagramName);
   const diagramId = useDiagramStore((s) => s.currentDiagramId);
   const isCollaborator = useDiagramStore((s) => s.isCollaborator);
@@ -605,8 +606,10 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
 
 export default function DiagramCanvas({ shareToken }: DiagramCanvasProps = {}) {
   return (
-    <ReactFlowProvider>
-      <DiagramCanvasInner shareToken={shareToken} />
-    </ReactFlowProvider>
+    <DiagramErrorBoundary>
+      <ReactFlowProvider>
+        <DiagramCanvasInner shareToken={shareToken} />
+      </ReactFlowProvider>
+    </DiagramErrorBoundary>
   );
 }
