@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +14,6 @@ function getKeyBytes(): Uint8Array {
   const raw = Deno.env.get("DIAGRAM_ENCRYPTION_KEY");
   if (!raw) throw new Error("DIAGRAM_ENCRYPTION_KEY not configured");
 
-  // Decode Base64 key → 32 bytes (AES-256)
   const decoded = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
   if (decoded.length !== 32) {
     throw new Error("DIAGRAM_ENCRYPTION_KEY must be 32 bytes (Base64-encoded)");
@@ -28,7 +28,6 @@ async function importKey(keyBytes: Uint8Array): Promise<CryptoKey> {
   ]);
 }
 
-/** Encrypt JSON → { iv, ciphertext } (both Base64) */
 async function encrypt(
   plainJson: unknown,
   key: CryptoKey,
@@ -48,7 +47,6 @@ async function encrypt(
   };
 }
 
-/** Decrypt { iv, ciphertext } → parsed JSON */
 async function decrypt(
   payload: { iv: string; ciphertext: string },
   key: CryptoKey,
@@ -65,7 +63,6 @@ async function decrypt(
   return JSON.parse(new TextDecoder().decode(decrypted));
 }
 
-/** Detect if value is an encrypted envelope */
 function isEncrypted(value: unknown): value is { iv: string; ciphertext: string } {
   return (
     typeof value === "object" &&
@@ -83,6 +80,31 @@ serve(async (req) => {
   }
 
   try {
+    // ── Authentication ──────────────────────────────────────
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } },
+    );
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: "Invalid token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ── Business logic ──────────────────────────────────────
     const body = await req.json();
     const { action, nodes, edges } = body as {
       action: "encrypt" | "decrypt";
@@ -111,7 +133,7 @@ serve(async (req) => {
       );
     }
 
-    // decrypt — handle both encrypted and plain (backward-compat)
+    // decrypt
     const decNodes = isEncrypted(nodes) ? await decrypt(nodes, key) : nodes;
     const decEdges = isEncrypted(edges) ? await decrypt(edges, key) : edges;
 
@@ -122,7 +144,7 @@ serve(async (req) => {
   } catch (e) {
     console.error("diagram-crypto error:", e);
     return new Response(
-      JSON.stringify({ error: e.message || "Encryption/decryption failed" }),
+      JSON.stringify({ error: "Encryption/decryption failed. Please try again later." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
