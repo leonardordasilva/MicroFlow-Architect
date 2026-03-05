@@ -169,7 +169,7 @@ export default function EditableEdge({
           initialOffsetMidX: midOffsetX,
           axis: role === 'midX' ? 'x' : 'y',
           mode: role === 'midX' ? 'horizontal' : 'vertical',
-          locked: Math.abs(sourceOffsetY - targetOffsetY) < 2,
+          locked: (Math.abs(sourceOffsetY) > 0.5 || Math.abs(targetOffsetY) > 0.5) && Math.abs(sourceOffsetY - targetOffsetY) < 2,
         };
 
         const currentRole = role;
