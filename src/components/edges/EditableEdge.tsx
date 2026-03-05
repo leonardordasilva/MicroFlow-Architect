@@ -89,9 +89,11 @@ export default function EditableEdge({
   const midOffsetX = edgeData?.midOffsetX ?? (edgeData as any)?.midOffset ?? 0;
   const sourceOffsetY = edgeData?.sourceOffsetY ?? 0;
   const targetOffsetY = edgeData?.targetOffsetY ?? 0;
-  const offsetsLocked = !!(edgeData as any)?.offsetsLocked;
-  const offsetsLockedRef = useRef(offsetsLocked);
-  offsetsLockedRef.current = offsetsLocked;
+  // Check if visually aligned (actual rendered Y positions, not just offsets)
+  const rawLocked = !!(edgeData as any)?.offsetsLocked;
+  const visuallyAligned = rawLocked && Math.abs((sourceY + sourceOffsetY) - (targetY + targetOffsetY)) < 2;
+  const offsetsLockedRef = useRef(visuallyAligned);
+  offsetsLockedRef.current = visuallyAligned;
 
   const defaultMx = (sourceX + targetX) / 2;
   const mx = defaultMx + midOffsetX;
