@@ -147,16 +147,26 @@ export function useRealtimeCollab(shareToken: string | null) {
           }
           lastUpdatedAtRef.current = remoteUpdatedAt || '';
 
+          const remoteNodes = newRecord.nodes;
+          const remoteEdges = newRecord.edges;
+
+          // FIX: After save, DB stores encrypted envelopes (objects with iv/ciphertext).
+          // Postgres Realtime delivers these raw encrypted objects. Pushing them into the
+          // store would corrupt React Flow (expects arrays), causing "e is not iterable"
+          // and a blank canvas. Skip the update when data is not a plain array.
+          if (!Array.isArray(remoteNodes) || !Array.isArray(remoteEdges)) {
+            console.debug('[RealtimeCollab] Skipping DB update with non-array (encrypted) data');
+            return;
+          }
+
           const store = useDiagramStore.getState();
-          const remoteNodes = newRecord.nodes as DiagramNode[];
-          const remoteEdges = newRecord.edges as DiagramEdge[];
 
           isRemoteUpdate.current = true;
           const temporal = useDiagramStore.temporal.getState();
           temporal.pause();
 
-          store.setNodes(remoteNodes);
-          store.setEdges(remoteEdges);
+          store.setNodes(remoteNodes as DiagramNode[]);
+          store.setEdges(remoteEdges as DiagramEdge[]);
           if (newRecord.title && newRecord.title !== store.diagramName) {
             store.setDiagramName(newRecord.title);
           }

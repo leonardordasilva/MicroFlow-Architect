@@ -79,14 +79,8 @@ export const useDiagramStore = create<DiagramStore>()(
       isCollaborator: false,
 
       // Setters
-      setNodes: (nodes) => {
-        if (!Array.isArray(nodes)) { console.error('[Store] setNodes called with non-array:', typeof nodes, nodes); set({ nodes: [] }); return; }
-        set({ nodes });
-      },
-      setEdges: (edges) => {
-        if (!Array.isArray(edges)) { console.error('[Store] setEdges called with non-array:', typeof edges, edges); set({ edges: [] }); return; }
-        set({ edges });
-      },
+      setNodes: (nodes) => set({ nodes: Array.isArray(nodes) ? nodes : [] }),
+      setEdges: (edges) => set({ edges: Array.isArray(edges) ? edges : [] }),
       setDiagramName: (diagramName) => set({ diagramName }),
       setCurrentDiagramId: (currentDiagramId) => set({ currentDiagramId }),
       setIsAnalyzing: (isAnalyzing) => set({ isAnalyzing }),
@@ -96,19 +90,12 @@ export const useDiagramStore = create<DiagramStore>()(
       // React Flow handlers - avoid unnecessary updates to prevent infinite loops
       onNodesChange: (changes) => {
         if (!changes || changes.length === 0) return;
-        const { nodes } = get();
-        if (!Array.isArray(nodes)) { set({ nodes: [] }); return; }
-        const updated = applyNodeChanges(changes, nodes) as DiagramNode[];
-        // Only update if reference actually changed (avoid render loop)
-        if (updated !== nodes) set({ nodes: Array.isArray(updated) ? updated : [] });
+        set({ nodes: applyNodeChanges(changes, get().nodes) as DiagramNode[] });
       },
 
       onEdgesChange: (changes) => {
         if (!changes || changes.length === 0) return;
-        const { edges } = get();
-        if (!Array.isArray(edges)) { set({ edges: [] }); return; }
-        const updated = applyEdgeChanges(changes, edges) as DiagramEdge[];
-        if (updated !== edges) set({ edges: Array.isArray(updated) ? updated : [] });
+        set({ edges: applyEdgeChanges(changes, get().edges) as DiagramEdge[] });
       },
 
       onConnect: (connection) => {

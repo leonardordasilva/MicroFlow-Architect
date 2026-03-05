@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -75,26 +75,8 @@ interface DiagramCanvasProps {
 
 function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
   const navigate = useNavigate();
-  const rawNodes = useDiagramStore((s) => s.nodes);
-  const rawEdges = useDiagramStore((s) => s.edges);
-
-  // GUARD: React Flow crashes with "e is not iterable" if nodes/edges are not arrays.
-  // This can happen if store state is corrupted (e.g. encrypted envelope objects from DB).
-  const nodes = useMemo(() => {
-    if (!Array.isArray(rawNodes)) {
-      console.error('[DiagramCanvas] nodes is not an array:', typeof rawNodes, rawNodes);
-      return [];
-    }
-    return rawNodes;
-  }, [rawNodes]);
-
-  const edges = useMemo(() => {
-    if (!Array.isArray(rawEdges)) {
-      console.error('[DiagramCanvas] edges is not an array:', typeof rawEdges, rawEdges);
-      return [];
-    }
-    return rawEdges;
-  }, [rawEdges]);
+  const nodes = useDiagramStore((s) => s.nodes);
+  const edges = useDiagramStore((s) => s.edges);
   const diagramName = useDiagramStore((s) => s.diagramName);
   const diagramId = useDiagramStore((s) => s.currentDiagramId);
   const isCollaborator = useDiagramStore((s) => s.isCollaborator);
