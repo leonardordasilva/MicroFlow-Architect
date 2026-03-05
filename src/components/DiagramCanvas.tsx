@@ -75,8 +75,8 @@ interface DiagramCanvasProps {
 
 function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
   const navigate = useNavigate();
-  const nodes = useDiagramStore((s) => Array.isArray(s.nodes) ? s.nodes : []);
-  const edges = useDiagramStore((s) => Array.isArray(s.edges) ? s.edges : []);
+  const nodes = useDiagramStore((s) => s.nodes);
+  const edges = useDiagramStore((s) => s.edges);
   const diagramName = useDiagramStore((s) => s.diagramName);
   const diagramId = useDiagramStore((s) => s.currentDiagramId);
   const isCollaborator = useDiagramStore((s) => s.isCollaborator);
