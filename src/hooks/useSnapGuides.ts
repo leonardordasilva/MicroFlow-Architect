@@ -99,9 +99,56 @@ export function useSnapGuides(nodes: Node[]) {
     [nodes]
   );
 
-  const onNodeDragStop = useCallback(() => {
-    setGuides([]);
-  }, []);
+  const onNodeDragStop = useCallback(
+    (_event: React.MouseEvent, draggedNode: Node) => {
+      setGuides([]);
+
+      // Re-apply snap on drop to ensure final position is snapped
+      const dragW = draggedNode.measured?.width ?? 160;
+      const dragH = draggedNode.measured?.height ?? 80;
+      const dragX = draggedNode.position.x;
+      const dragY = draggedNode.position.y;
+      const dragCX = dragX + dragW / 2;
+      const dragCY = dragY + dragH / 2;
+
+      let snapX: number | null = null;
+      let snapY: number | null = null;
+      let bestDx = SNAP_THRESHOLD;
+      let bestDy = SNAP_THRESHOLD;
+
+      for (const node of nodes) {
+        if (node.id === draggedNode.id) continue;
+        const nW = node.measured?.width ?? 160;
+        const nH = node.measured?.height ?? 80;
+        const nCX = node.position.x + nW / 2;
+        const nCY = node.position.y + nH / 2;
+
+        const dCX = Math.abs(dragCX - nCX);
+        if (dCX < bestDx) { bestDx = dCX; snapX = nCX - dragW / 2; }
+        const dLX = Math.abs(dragX - node.position.x);
+        if (dLX < bestDx) { bestDx = dLX; snapX = node.position.x; }
+        const dRX = Math.abs(dragX + dragW - (node.position.x + nW));
+        if (dRX < bestDx) { bestDx = dRX; snapX = node.position.x + nW - dragW; }
+
+        const dCY2 = Math.abs(dragCY - nCY);
+        if (dCY2 < bestDy) { bestDy = dCY2; snapY = nCY - dragH / 2; }
+        const dTY = Math.abs(dragY - node.position.y);
+        if (dTY < bestDy) { bestDy = dTY; snapY = node.position.y; }
+        const dBY = Math.abs(dragY + dragH - (node.position.y + nH));
+        if (dBY < bestDy) { bestDy = dBY; snapY = node.position.y + nH - dragH; }
+      }
+
+      if (snapX !== null || snapY !== null) {
+        const newPos = { x: snapX ?? dragX, y: snapY ?? dragY };
+        useDiagramStore.getState().setNodes(
+          useDiagramStore.getState().nodes.map((n) =>
+            n.id === draggedNode.id ? { ...n, position: newPos } : n
+          )
+        );
+      }
+    },
+    [nodes]
+  );
 
   return { guides, onNodeDrag, onNodeDragStop };
 }
