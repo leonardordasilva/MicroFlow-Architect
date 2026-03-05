@@ -73,10 +73,20 @@ export async function saveDiagram(
       .update(updatePayload)
       .eq('id', existingId)
       .eq('owner_id', ownerId)
-      .select()
+      .select('id, title, owner_id, share_token, created_at, updated_at')
       .single();
     if (error) throw error;
-    return toDiagramRecord(data);
+    // Return the record with the original (unencrypted) nodes/edges to avoid a costly decrypt round-trip
+    return {
+      id: data.id,
+      title: data.title,
+      nodes,
+      edges,
+      owner_id: data.owner_id,
+      share_token: data.share_token,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+    };
   }
 
   const insertPayload: TablesInsert<'diagrams'> = {
@@ -88,10 +98,20 @@ export async function saveDiagram(
   const { data, error } = await supabase
     .from('diagrams')
     .insert(insertPayload)
-    .select()
+    .select('id, title, owner_id, share_token, created_at, updated_at')
     .single();
   if (error) throw error;
-  return toDiagramRecord(data);
+  // Return with original unencrypted data
+  return {
+    id: data.id,
+    title: data.title,
+    nodes,
+    edges,
+    owner_id: data.owner_id,
+    share_token: data.share_token,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
+  };
 }
 
 export async function loadDiagramByToken(shareToken: string): Promise<DiagramRecord | null> {
