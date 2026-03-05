@@ -89,6 +89,9 @@ export default function EditableEdge({
   const midOffsetX = edgeData?.midOffsetX ?? (edgeData as any)?.midOffset ?? 0;
   const sourceOffsetY = edgeData?.sourceOffsetY ?? 0;
   const targetOffsetY = edgeData?.targetOffsetY ?? 0;
+  const offsetsLocked = !!(edgeData as any)?.offsetsLocked;
+  const offsetsLockedRef = useRef(offsetsLocked);
+  offsetsLockedRef.current = offsetsLocked;
 
   const defaultMx = (sourceX + targetX) / 2;
   const mx = defaultMx + midOffsetX;
@@ -169,7 +172,7 @@ export default function EditableEdge({
           initialOffsetMidX: midOffsetX,
           axis: role === 'midX' ? 'x' : 'y',
           mode: role === 'midX' ? 'horizontal' : 'vertical',
-          locked: !!(edgeData as any)?.offsetsLocked,
+          locked: offsetsLockedRef.current,
         };
 
         const currentRole = role;
@@ -214,7 +217,7 @@ export default function EditableEdge({
                   if (Math.abs(newSourceY - curTargetY) < SNAP_THRESHOLD) {
                     return { ...edge, data: { ...edge.data, sourceOffsetY: curTargetY, targetOffsetY: curTargetY, offsetsLocked: true } };
                   }
-                  return { ...edge, data: { ...edge.data, sourceOffsetY: newSourceY, offsetsLocked: false } };
+                  return { ...edge, data: { ...edge.data, sourceOffsetY: newSourceY } };
                 })
               );
             } else {
@@ -226,7 +229,7 @@ export default function EditableEdge({
                   if (Math.abs(newTargetY - curSourceY) < SNAP_THRESHOLD) {
                     return { ...edge, data: { ...edge.data, sourceOffsetY: curSourceY, targetOffsetY: curSourceY, offsetsLocked: true } };
                   }
-                  return { ...edge, data: { ...edge.data, targetOffsetY: newTargetY, offsetsLocked: false } };
+                  return { ...edge, data: { ...edge.data, targetOffsetY: newTargetY } };
                 })
               );
             }
