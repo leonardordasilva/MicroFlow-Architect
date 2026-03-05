@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: {
           'react-flow': ['@xyflow/react'],
-          'layout-engines': ['dagre'],
+          'dagre-layout': ['dagre'], // elkjs é carregado dinamicamente (lazy)
           'export-utils': ['html-to-image'],
           'supabase': ['@supabase/supabase-js'],
         },

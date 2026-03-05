@@ -35,7 +35,8 @@ import AIGenerateModal from '@/components/AIGenerateModal';
 import AIAnalysisPanel from '@/components/AIAnalysisPanel';
 import ImportJSONModal from '@/components/ImportJSONModal';
 import SpawnFromNodeModal from '@/components/SpawnFromNodeModal';
-import type { DiagramNodeData, NodeType } from '@/types/diagram';
+import type { DiagramNodeData, DiagramNode, DiagramEdge, NodeType } from '@/types/diagram';
+import type { ImportDiagramInput } from '@/schemas/diagramSchema';
 import { exportToMermaid } from '@/services/exportService';
 import MermaidExportModal from '@/components/MermaidExportModal';
 
@@ -123,7 +124,14 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [interactionMode, setInteractionMode] = useState<'pan' | 'select'>('pan');
+  // FUNC-01: Persist interaction mode in localStorage
+  const [interactionMode, setInteractionMode] = useState<'pan' | 'select'>(
+    () => localStorage.getItem('microflow_interaction_mode') === 'select' ? 'select' : 'pan'
+  );
+  const handleSetInteractionMode = useCallback((mode: 'pan' | 'select') => {
+    setInteractionMode(mode);
+    localStorage.setItem('microflow_interaction_mode', mode);
+  }, []);
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { guides, onNodeDrag, onNodeDragStop } = useSnapGuides(nodes);
@@ -137,6 +145,13 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
       broadcastChanges(nodes, edges);
     }
   }, [nodes, edges, shareToken, broadcastChanges]);
+
+  // FUNC-04: Clear selectedNodeId if the selected node was removed
+  useEffect(() => {
+    if (selectedNodeId && !nodes.find((n) => n.id === selectedNodeId)) {
+      setSelectedNodeId(null);
+    }
+  }, [nodes, selectedNodeId]);
 
   // UX-04: Persist dark mode and apply on mount/change
   const toggleDarkMode = useCallback(() => {
@@ -218,9 +233,10 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     toast({ title: 'JSON exportado com sucesso!' });
   }, [exportJSON, diagramName]);
 
+  // SEC-04 / QUA-06: Typed import handler
   const handleImport = useCallback(
-    (data: { nodes: any[]; edges: any[]; name?: string }) => {
-      loadDiagram(data.nodes, data.edges);
+    (data: ImportDiagramInput) => {
+      loadDiagram(data.nodes as DiagramNode[], data.edges as DiagramEdge[]);
       if (data.name) setDiagramName(data.name);
       lastLoadedUpdatedAtRef.current = null;
       toast({ title: 'Diagrama importado com sucesso!' });
@@ -230,7 +246,8 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Delete') deleteSelected();
+      // FUNC-04: Clear selectedNodeId on delete
+      if (e.key === 'Delete') { deleteSelected(); setSelectedNodeId(null); }
       if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
       if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
       if (e.ctrlKey && e.shiftKey && e.key === 'Z') { e.preventDefault(); redo(); }
@@ -304,6 +321,10 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
         const temporal = useDiagramStore.temporal.getState();
         temporal.pause();
         loadDiagram(record.nodes, record.edges);
+        // FUNC-05: Sync title on refresh
+        if (record.title && record.title !== diagramName) {
+          setDiagramName(record.title);
+        }
         temporal.resume();
         lastLoadedUpdatedAtRef.current = record.updated_at;
         toast({ title: 'Diagrama atualizado com sucesso!' });
@@ -313,7 +334,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     } finally {
       setRefreshing(false);
     }
-  }, [diagramId, loadDiagram]);
+  }, [diagramId, loadDiagram, diagramName, setDiagramName]);
 
   // Smart node positioning using viewport center
   const handleAddNode = useCallback(
@@ -474,7 +495,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
                   variant={interactionMode === 'pan' ? 'default' : 'ghost'}
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => setInteractionMode('pan')}
+                  onClick={() => handleSetInteractionMode('pan')}
                   aria-label="Mover canvas"
                 >
                   <Hand className="h-4 w-4" />
@@ -488,7 +509,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
                   variant={interactionMode === 'select' ? 'default' : 'ghost'}
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => setInteractionMode('select')}
+                  onClick={() => handleSetInteractionMode('select')}
                   aria-label="Selecionar objetos"
                 >
                   <MousePointer2 className="h-4 w-4" />

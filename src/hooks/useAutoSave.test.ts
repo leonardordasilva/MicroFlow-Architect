@@ -14,7 +14,7 @@ describe('getAutoSave', () => {
 
   it('should return saved data from legacy format', async () => {
     const data: AutoSaveData = {
-      nodes: [{ id: '1' }],
+      nodes: [{ id: '1', type: 'service', position: { x: 0, y: 0 }, data: { label: 'Test', type: 'service' } }] as any,
       edges: [],
       title: 'Test',
       savedAt: new Date().toISOString(),

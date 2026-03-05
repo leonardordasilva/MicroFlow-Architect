@@ -12,7 +12,7 @@ import { ZodError } from 'zod';
 interface ImportJSONModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImport: (data: { nodes: any[]; edges: any[]; name?: string }) => void;
+  onImport: (data: import('@/schemas/diagramSchema').ImportDiagramInput) => void;
 }
 
 export default function ImportJSONModal({ open, onOpenChange, onImport }: ImportJSONModalProps) {

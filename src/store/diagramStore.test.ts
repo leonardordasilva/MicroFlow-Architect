@@ -201,6 +201,22 @@ describe('diagramStore', () => {
       expect(getState().edges[0].target).toBe(queue.id);
     });
 
+    // FUNC-03: onConnect blocks invalid connections
+    it('onConnect bloqueia conexão database→queue', () => {
+      getState().addNode('database', 'Oracle');
+      getState().addNode('queue', 'Kafka');
+      const [db, queue] = getState().nodes;
+
+      getState().onConnect({
+        source: db.id,
+        target: queue.id,
+        sourceHandle: null,
+        targetHandle: null,
+      });
+
+      expect(getState().edges).toHaveLength(0);
+    });
+
     it('should create edge for queue→service without protocol labels', () => {
       getState().addNode('queue', 'MQ');
       getState().addNode('service');
