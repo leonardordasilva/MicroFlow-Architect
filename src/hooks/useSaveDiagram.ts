@@ -3,7 +3,6 @@ import { useDiagramStore } from '@/store/diagramStore';
 import { useAuth } from '@/hooks/useAuth';
 import { saveDiagram, saveSharedDiagram } from '@/services/diagramService';
 import { toast } from '@/hooks/use-toast';
-import type { DiagramNode, DiagramEdge } from '@/types/diagram';
 
 interface UseSaveDiagramOptions {
   shareToken?: string;
@@ -20,15 +19,14 @@ export function useSaveDiagram({ shareToken }: UseSaveDiagramOptions = {}): UseS
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
 
-  const nodes = useDiagramStore((s) => s.nodes);
-  const edges = useDiagramStore((s) => s.edges);
-  const diagramName = useDiagramStore((s) => s.diagramName);
-  const diagramId = useDiagramStore((s) => s.currentDiagramId);
-  const isCollaborator = useDiagramStore((s) => s.isCollaborator);
-  const setDiagramId = useDiagramStore((s) => s.setCurrentDiagramId);
-
+  // PERF-05: Read store state at call time instead of subscribing — avoids unnecessary callback recreation
   const save = useCallback(async () => {
     if (!user) return;
+
+    // Snapshot current store state at the moment of save
+    const { nodes, edges, diagramName, currentDiagramId: diagramId, isCollaborator } = useDiagramStore.getState();
+    const setDiagramId = useDiagramStore.getState().setCurrentDiagramId;
+
     setSaving(true);
     try {
       if (isCollaborator && diagramId) {
@@ -49,11 +47,12 @@ export function useSaveDiagram({ shareToken }: UseSaveDiagramOptions = {}): UseS
         }
       }
     } catch (err: any) {
+      console.error('[useSaveDiagram] Save error:', err);
       toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
-  }, [user, diagramName, nodes, edges, diagramId, shareToken, isCollaborator, setDiagramId]);
+  }, [user, shareToken]); // Minimal deps — store state read at call time
 
   // PERF-05: Stable ref always pointing to latest save
   const saveRef = useRef<() => void>(() => {});
