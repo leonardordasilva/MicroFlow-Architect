@@ -6,9 +6,11 @@ const STORAGE_KEY = 'microflow_autosave_v2';
 const LEGACY_STORAGE_KEY = 'microflow_autosave_v1';
 const DEBOUNCE_MS = 1500;
 
+import type { DiagramNode, DiagramEdge } from '@/types/diagram';
+
 export interface AutoSaveData {
-  nodes: any[];
-  edges: any[];
+  nodes: DiagramNode[];
+  edges: DiagramEdge[];
   title: string;
   savedAt: string;
   version: '2';

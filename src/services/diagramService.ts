@@ -123,6 +123,31 @@ export async function loadDiagramByToken(shareToken: string): Promise<DiagramRec
 
 const PAGE_SIZE = 12;
 
+// PERF-01: Concurrency limiter for parallel async operations
+async function withConcurrencyLimit<T>(
+  tasks: (() => Promise<T>)[],
+  limit: number,
+): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = new Array(tasks.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < tasks.length) {
+      const index = nextIndex++;
+      try {
+        const value = await tasks[index]();
+        results[index] = { status: 'fulfilled', value };
+      } catch (reason) {
+        results[index] = { status: 'rejected', reason };
+      }
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
+
 export async function loadUserDiagrams(
   userId: string,
   page = 0,
@@ -136,9 +161,10 @@ export async function loadUserDiagrams(
     .order('updated_at', { ascending: false })
     .range(from, to);
   if (error) return { diagrams: [], hasMore: false };
-  const settled = await Promise.allSettled(
-    (data || []).map((row) => toDiagramRecord(row)),
-  );
+
+  const tasks = (data || []).map((row) => () => toDiagramRecord(row));
+  const settled = await withConcurrencyLimit(tasks, 4);
+
   const rows: DiagramRecord[] = [];
   for (const result of settled) {
     if (result.status === 'fulfilled') {

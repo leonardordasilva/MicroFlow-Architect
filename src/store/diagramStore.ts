@@ -12,17 +12,8 @@ import {
 import type { DiagramNode, DiagramEdge, DiagramNodeData, NodeType } from '@/types/diagram';
 
 import { getLayoutedElements, getELKLayoutedElements, type LayoutDirection } from '@/services/layoutService';
-import { getDbColor } from '@/constants/databaseColors';
-
-function getNodeColor(type?: NodeType, subType?: string): string {
-  switch (type) {
-    case 'service': return 'hsl(217, 91%, 60%)';
-    case 'database': return getDbColor(subType);
-    case 'queue': return 'hsl(157, 52%, 49%)';
-    case 'external': return 'hsl(220, 9%, 46%)';
-    default: return '#888';
-  }
-}
+import { getNodeColor } from '@/utils/nodeColors';
+import { canConnect } from '@/utils/connectionRules';
 
 const createNodeId = () => `node_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
@@ -79,7 +70,35 @@ export const useDiagramStore = create<DiagramStore>()(
       isCollaborator: false,
 
       // Setters
-      setNodes: (nodes) => set({ nodes: Array.isArray(nodes) ? nodes : [] }),
+      // FUNC-02: setNodes also syncs edge colors when source node changes
+      setNodes: (nodes) => {
+        const safeNodes = Array.isArray(nodes) ? nodes : [];
+        set((state) => {
+          // Build a map of node id → node for quick lookup
+          const nodeMap = new Map(safeNodes.map((n) => [n.id, n]));
+          const updatedEdges = state.edges.map((edge) => {
+            const sourceNode = nodeMap.get(edge.source);
+            if (!sourceNode) return edge;
+            const sourceType = sourceNode.type as NodeType | undefined;
+            const sourceSubType = (sourceNode.data as DiagramNodeData | undefined)?.subType;
+            const targetNode = nodeMap.get(edge.target);
+            const targetType = targetNode?.type as NodeType | undefined;
+            const isQueueConnection = sourceType === 'queue' || targetType === 'queue';
+            const newColor = isQueueConnection ? 'hsl(157, 52%, 49%)' : getNodeColor(sourceType, sourceSubType);
+            const currentMarker = edge.markerEnd;
+            const currentColor = typeof currentMarker === 'object' ? currentMarker?.color : undefined;
+            if (currentColor === newColor && edge.data?.sourceNodeSubType === sourceSubType) return edge;
+            return {
+              ...edge,
+              markerEnd: typeof currentMarker === 'object'
+                ? { ...currentMarker, color: newColor }
+                : { type: MarkerType.ArrowClosed, color: newColor },
+              data: { ...edge.data, sourceNodeType: sourceType, sourceNodeSubType: sourceSubType, isQueueConnection },
+            };
+          });
+          return { nodes: safeNodes, edges: updatedEdges };
+        });
+      },
       setEdges: (edges) => set({ edges: Array.isArray(edges) ? edges : [] }),
       setDiagramName: (diagramName) => set({ diagramName }),
       setCurrentDiagramId: (currentDiagramId) => set({ currentDiagramId }),
@@ -87,29 +106,38 @@ export const useDiagramStore = create<DiagramStore>()(
       setAnalysisResult: (analysisResult) => set({ analysisResult }),
       setIsCollaborator: (isCollaborator) => set({ isCollaborator }),
 
-      // React Flow handlers - avoid unnecessary updates to prevent infinite loops
+      // QUA-05: React Flow handlers with reference comparison
       onNodesChange: (changes) => {
         if (!changes || changes.length === 0) return;
-        set({ nodes: applyNodeChanges(changes, get().nodes) as DiagramNode[] });
+        const current = get().nodes;
+        const updated = applyNodeChanges(changes, current) as DiagramNode[];
+        if (updated !== current) set({ nodes: updated });
       },
 
       onEdgesChange: (changes) => {
         if (!changes || changes.length === 0) return;
-        set({ edges: applyEdgeChanges(changes, get().edges) as DiagramEdge[] });
+        const current = get().edges;
+        const updated = applyEdgeChanges(changes, current) as DiagramEdge[];
+        if (updated !== current) set({ edges: updated });
       },
 
+      // FUNC-03 / PERF-02: onConnect reads nodes inside set() callback, validates with canConnect
       onConnect: (connection) => {
-        const { nodes } = get();
-        const sourceNode = nodes.find((n) => n.id === connection.source);
-        const sourceType = sourceNode?.type as NodeType | undefined;
-        const sourceSubType = (sourceNode?.data as DiagramNodeData | undefined)?.subType;
-        const isQueue = sourceType === 'queue';
-        const targetNode = nodes.find((n) => n.id === connection.target);
-        const targetType = targetNode?.type as NodeType | undefined;
-        // Queue connections are always green
-        const isQueueConnection = sourceType === 'queue' || targetType === 'queue';
-        const edgeColor = isQueueConnection ? 'hsl(157, 52%, 49%)' : getNodeColor(sourceType, sourceSubType);
         set((state) => {
+          const sourceNode = state.nodes.find((n) => n.id === connection.source);
+          const targetNode = state.nodes.find((n) => n.id === connection.target);
+          const sourceType = (sourceNode?.type ?? 'service') as NodeType;
+          const targetType = (targetNode?.type ?? 'service') as NodeType;
+
+          // Defense-in-depth: validate connection rules
+          if (!canConnect(sourceType, targetType)) {
+            return { edges: state.edges };
+          }
+
+          const sourceSubType = (sourceNode?.data as DiagramNodeData | undefined)?.subType;
+          const isQueueConnection = sourceType === 'queue' || targetType === 'queue';
+          const edgeColor = isQueueConnection ? 'hsl(157, 52%, 49%)' : getNodeColor(sourceType, sourceSubType);
+
           const result = addEdge(
             {
               ...connection,
@@ -121,7 +149,10 @@ export const useDiagramStore = create<DiagramStore>()(
             },
             state.edges,
           ) as DiagramEdge[];
-          if (!Array.isArray(result)) { console.error('[Store] addEdge returned non-array:', typeof result, result); return { edges: state.edges }; }
+          if (!Array.isArray(result)) {
+            console.error('[Store] addEdge returned non-array:', typeof result, result);
+            return { edges: state.edges };
+          }
           return { edges: result };
         });
       },
@@ -250,9 +281,14 @@ export const useDiagramStore = create<DiagramStore>()(
 
       loadDiagram: (nodes, edges) => set({ nodes: Array.isArray(nodes) ? nodes : [], edges: Array.isArray(edges) ? edges : [], isCollaborator: false }),
 
+      // PERF-03: Project only essential fields in exported JSON
       exportJSON: () => {
         const { diagramName, nodes, edges } = get();
-        return JSON.stringify({ name: diagramName, nodes, edges }, null, 2);
+        const projectedNodes = nodes.map(({ id, type, position, data }) => ({ id, type, position, data }));
+        const projectedEdges = edges.map(({ id, source, target, type, animated, style, markerEnd, data, label }) => ({
+          id, source, target, type, animated, style, markerEnd, data, label,
+        }));
+        return JSON.stringify({ name: diagramName, nodes: projectedNodes, edges: projectedEdges }, null, 2);
       },
 
     }),

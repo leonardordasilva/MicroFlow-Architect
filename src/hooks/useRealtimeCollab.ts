@@ -1,6 +1,8 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { useDiagramStore } from '@/store/diagramStore';
+import { DbDiagramNodesSchema, DbDiagramEdgesSchema } from '@/schemas/diagramSchema';
 import type { DiagramNode, DiagramEdge } from '@/types/diagram';
 
 const DEBOUNCE_MS = 300;
@@ -9,6 +11,21 @@ export interface Collaborator {
   userId: string;
   email: string;
   color: string;
+}
+
+// SEC-02: Zod schema for presence validation
+const PresenceItemSchema = z.object({
+  userId: z.string().min(1).max(64),
+  email: z.string().email().max(254).optional(),
+});
+
+// QUA-02: Typed payload for DB realtime updates
+interface DiagramUpdatePayload {
+  id: string;
+  title?: string;
+  nodes: unknown;
+  edges: unknown;
+  updated_at?: string;
 }
 
 const AVATAR_COLORS = [
@@ -62,15 +79,26 @@ export function useRealtimeCollab(shareToken: string | null) {
 
     channel
       .on('broadcast', { event: 'diagram_updated' }, (payload) => {
-        const { nodes, edges } = payload.payload as { nodes: DiagramNode[]; edges: DiagramEdge[] };
+        // SEC-03: Validate broadcast payload before applying
+        const rawPayload = payload.payload as { nodes: unknown; edges: unknown };
+        const nodesParsed = DbDiagramNodesSchema.safeParse(rawPayload.nodes);
+        const edgesParsed = DbDiagramEdgesSchema.safeParse(rawPayload.edges);
+        if (!nodesParsed.success || !edgesParsed.success) {
+          console.warn('[RealtimeCollab] Invalid broadcast payload, ignoring', {
+            nodesError: nodesParsed.success ? null : nodesParsed.error,
+            edgesError: edgesParsed.success ? null : edgesParsed.error,
+          });
+          return;
+        }
+
         isRemoteUpdate.current = true;
 
         const temporal = useDiagramStore.temporal.getState();
         temporal.pause();
 
         const store = useDiagramStore.getState();
-        store.setNodes(nodes);
-        store.setEdges(edges);
+        store.setNodes(nodesParsed.data as DiagramNode[]);
+        store.setEdges(edgesParsed.data as DiagramEdge[]);
 
         temporal.resume();
 
@@ -82,13 +110,17 @@ export function useRealtimeCollab(shareToken: string | null) {
         const state = channel.presenceState();
         const users: Collaborator[] = [];
         const seen = new Set<string>();
-        Object.values(state).forEach((presences: any[]) => {
-          presences.forEach((p) => {
-            if (p.userId && !seen.has(p.userId)) {
-              seen.add(p.userId);
+        // SEC-02: Validate each presence item
+        Object.values(state).forEach((presences: unknown[]) => {
+          (presences as unknown[]).forEach((p) => {
+            const parsed = PresenceItemSchema.safeParse(p);
+            if (!parsed.success) return;
+            const { userId, email } = parsed.data;
+            if (!seen.has(userId)) {
+              seen.add(userId);
               users.push({
-                userId: p.userId,
-                email: p.email || '',
+                userId,
+                email: email || '',
                 color: AVATAR_COLORS[users.length % AVATAR_COLORS.length],
               });
             }
@@ -138,10 +170,11 @@ export function useRealtimeCollab(shareToken: string | null) {
         (payload) => {
           if (isRemoteUpdate.current) return;
 
-          const newRecord = payload.new as any;
+          // QUA-02: Use typed payload
+          const newRecord = payload.new as DiagramUpdatePayload;
 
           // PERF-03: Compare updated_at first to avoid expensive JSON operations
-          const remoteUpdatedAt = newRecord.updated_at as string;
+          const remoteUpdatedAt = newRecord.updated_at;
           if (remoteUpdatedAt && remoteUpdatedAt === lastUpdatedAtRef.current) {
             return;
           }
