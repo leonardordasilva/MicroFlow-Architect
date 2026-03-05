@@ -190,20 +190,14 @@ export default function EditableEdge({
                 edge.id === id ? { ...edge, data: { ...edge.data, midOffsetX: newMidX } } : edge
               )
             );
-          } else if (currentRole === 'sourceY') {
+          } else {
+            // Move both sourceOffsetY and targetOffsetY together
             const dy = svgPt.y - draggingRef.current.startSvg.y;
             const newSourceY = draggingRef.current.initialOffsetSourceY + dy;
-            setEdges((edges) =>
-              edges.map((edge) =>
-                edge.id === id ? { ...edge, data: { ...edge.data, sourceOffsetY: newSourceY } } : edge
-              )
-            );
-          } else if (currentRole === 'targetY') {
-            const dy = svgPt.y - draggingRef.current.startSvg.y;
             const newTargetY = draggingRef.current.initialOffsetTargetY + dy;
             setEdges((edges) =>
               edges.map((edge) =>
-                edge.id === id ? { ...edge, data: { ...edge.data, targetOffsetY: newTargetY } } : edge
+                edge.id === id ? { ...edge, data: { ...edge.data, sourceOffsetY: newSourceY, targetOffsetY: newTargetY } } : edge
               )
             );
           }
