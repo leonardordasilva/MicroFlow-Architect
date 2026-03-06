@@ -97,7 +97,7 @@ export function useExportHandlers(darkMode: boolean) {
     } catch {
       toast({ title: 'Erro ao exportar PNG', variant: 'destructive' });
     }
-  }, [darkMode, diagramName, getFlowNodes, edges, nodes]);
+  }, [darkMode, diagramName, getFlowNodes]);
 
   const handleExportSVG = useCallback(async () => {
     const flowNodes = getFlowNodes();
@@ -131,7 +131,7 @@ export function useExportHandlers(darkMode: boolean) {
     } catch {
       toast({ title: 'Erro ao exportar SVG', variant: 'destructive' });
     }
-  }, [darkMode, diagramName, getFlowNodes, edges, nodes]);
+  }, [darkMode, diagramName, getFlowNodes]);
 
   const handleExportMermaid = useCallback(() => {
     return exportToMermaid(nodes, edges);
