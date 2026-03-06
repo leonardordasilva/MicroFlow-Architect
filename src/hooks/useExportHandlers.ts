@@ -68,7 +68,7 @@ export function useExportHandlers(darkMode: boolean) {
   const handleExportPNG = useCallback(async () => {
     const flowNodes = getFlowNodes();
     if (flowNodes.length === 0) return;
-    const bounds = getFullDiagramBounds(flowNodes, edges, nodes);
+    const bounds = getFullDiagramBounds(flowNodes);
     const padding = 20;
     const imageWidth = Math.ceil(bounds.width + padding * 2);
     const imageHeight = Math.ceil(bounds.height + padding * 2);
@@ -102,7 +102,7 @@ export function useExportHandlers(darkMode: boolean) {
   const handleExportSVG = useCallback(async () => {
     const flowNodes = getFlowNodes();
     if (flowNodes.length === 0) return;
-    const bounds = getFullDiagramBounds(flowNodes, edges, nodes);
+    const bounds = getFullDiagramBounds(flowNodes);
     const padding = 20;
     const imageWidth = Math.ceil(bounds.width + padding * 2);
     const imageHeight = Math.ceil(bounds.height + padding * 2);
