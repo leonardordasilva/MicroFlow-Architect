@@ -18,6 +18,8 @@ import {
   BackgroundVariant,
   SelectionMode,
   useReactFlow,
+  getNodesBounds,
+  getViewportForBounds,
   type Connection,
 } from '@xyflow/react';
 import { useSnapGuides } from '@/hooks/useSnapGuides';
