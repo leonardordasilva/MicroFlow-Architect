@@ -211,12 +211,16 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     return true;
   }, []);
 
+  const { getNodes: getFlowNodes } = useReactFlow();
+
   const handleExportPNG = useCallback(async () => {
-    const nodesBounds = getNodesBounds(nodes);
-    const padding = 40;
-    const imageWidth = nodesBounds.width + padding * 2;
-    const imageHeight = nodesBounds.height + padding * 2;
-    const viewport = getViewportForBounds(nodesBounds, imageWidth, imageHeight, 0.5, 2, padding);
+    const flowNodes = getFlowNodes();
+    if (flowNodes.length === 0) return;
+    const bounds = getNodesBounds(flowNodes);
+    const padding = 20;
+    const imageWidth = bounds.width + padding * 2;
+    const imageHeight = bounds.height + padding * 2;
+    const viewport = getViewportForBounds(bounds, imageWidth, imageHeight, 0.5, 2, padding);
 
     const el = document.querySelector('.react-flow__viewport') as HTMLElement;
     if (!el) return;
@@ -240,14 +244,16 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     } catch {
       toast({ title: 'Erro ao exportar PNG', variant: 'destructive' });
     }
-  }, [darkMode, diagramName, exportFilter, nodes]);
+  }, [darkMode, diagramName, exportFilter, getFlowNodes]);
 
   const handleExportSVG = useCallback(async () => {
-    const nodesBounds = getNodesBounds(nodes);
-    const padding = 40;
-    const imageWidth = nodesBounds.width + padding * 2;
-    const imageHeight = nodesBounds.height + padding * 2;
-    const viewport = getViewportForBounds(nodesBounds, imageWidth, imageHeight, 0.5, 2, padding);
+    const flowNodes = getFlowNodes();
+    if (flowNodes.length === 0) return;
+    const bounds = getNodesBounds(flowNodes);
+    const padding = 20;
+    const imageWidth = bounds.width + padding * 2;
+    const imageHeight = bounds.height + padding * 2;
+    const viewport = getViewportForBounds(bounds, imageWidth, imageHeight, 0.5, 2, padding);
 
     const el = document.querySelector('.react-flow__viewport') as HTMLElement;
     if (!el) return;
@@ -271,7 +277,7 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     } catch {
       toast({ title: 'Erro ao exportar SVG', variant: 'destructive' });
     }
-  }, [darkMode, diagramName, exportFilter, nodes]);
+  }, [darkMode, diagramName, exportFilter, getFlowNodes]);
 
   const handleExportMermaid = useCallback(() => {
     const code = exportToMermaid(nodes, edges);
