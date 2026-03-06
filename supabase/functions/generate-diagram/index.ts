@@ -227,36 +227,63 @@ Rules:
     let content = result.data.choices?.[0]?.message?.content || "";
     content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
 
-    const AiNodeSchema = z.object({
-      id: z.string(),
-      type: z.enum(["service", "database", "queue", "external"]),
-      position: z.object({ x: z.number(), y: z.number() }),
-      data: z.object({
-        label: z.string(),
-        type: z.enum(["service", "database", "queue", "external"]),
-      }).passthrough(),
-    });
-    const AiEdgeSchema = z.object({
-      id: z.string(),
-      source: z.string(),
-      target: z.string(),
+    // ─── Output Validation Schemas ───
+    const AiNodeDataSchema = z.object({
+      label: z.string().min(1).max(100),
+      type: z.enum(['service', 'database', 'queue', 'external']),
+      subType: z.string().optional(),
+      externalCategory: z.enum(['API','CDN','Auth','Payment','Storage','Analytics','Other']).optional(),
+      internalDatabases: z.array(z.unknown()).optional().default([]),
+      internalServices: z.array(z.unknown()).optional().default([]),
     }).passthrough();
-    const AiDiagramSchema = z.object({
-      nodes: z.array(AiNodeSchema),
-      edges: z.array(AiEdgeSchema),
+
+    const AiNodeSchema = z.object({
+      id: z.string().min(1),
+      type: z.enum(['service', 'database', 'queue', 'external']),
+      position: z.object({ x: z.number(), y: z.number() }),
+      data: AiNodeDataSchema,
+    }).passthrough();
+
+    const AiEdgeSchema = z.object({
+      id: z.string().min(1),
+      source: z.string().min(1),
+      target: z.string().min(1),
+      type: z.string().optional(),
+      animated: z.boolean().optional(),
+      label: z.string().optional(),
+      data: z.object({
+        protocol: z.string().optional(),
+      }).passthrough().optional(),
+    }).passthrough();
+
+    const AiDiagramOutputSchema = z.object({
+      nodes: z.array(AiNodeSchema).min(1).max(100),
+      edges: z.array(AiEdgeSchema).max(300),
     });
 
-    const validationResult = AiDiagramSchema.safeParse(diagram);
-    if (!validationResult.success) {
-      return new Response(JSON.stringify({ error: "AI returned invalid diagram structure.", details: validationResult.error.flatten() }), {
-        status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Parse e validação
+    let diagram: z.infer<typeof AiDiagramOutputSchema>;
+    try {
+      const rawDiagram = JSON.parse(content);
+      const parsed = AiDiagramOutputSchema.safeParse(rawDiagram);
+      if (!parsed.success) {
+        console.error("AI output validation failed:", JSON.stringify(parsed.error.issues));
+        return new Response(
+          JSON.stringify({ error: "O modelo de IA retornou uma estrutura inválida. Tente reformular sua descrição." }),
+          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      diagram = parsed.data;
+    } catch (_parseError) {
+      return new Response(
+        JSON.stringify({ error: "O modelo de IA retornou um JSON inválido. Tente novamente." }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
-    const diagram2 = validationResult.data;
-
+    // Normalização de edges
     const validProtocols = ['REST','gRPC','GraphQL','WebSocket','Kafka','AMQP','MQTT','HTTPS','TCP','UDP'];
-    const finalEdges = (diagram2.edges as any[]).map((edge: Record<string, unknown>) => {
+    const finalEdges = (diagram.edges as any[]).map((edge: Record<string, unknown>) => {
       const edgeData = (edge.data ?? {}) as Record<string, unknown>;
       if (!edgeData.protocol) {
         const labelProtocol = validProtocols.includes(edge.label as string) ? edge.label : 'REST';
@@ -270,7 +297,7 @@ Rules:
       return { ...edge, type: edge.type === 'smoothstep' ? 'editable' : (edge.type || 'editable') };
     });
 
-    return new Response(JSON.stringify({ nodes: diagram2.nodes, edges: finalEdges }), {
+    return new Response(JSON.stringify({ nodes: diagram.nodes, edges: finalEdges }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
