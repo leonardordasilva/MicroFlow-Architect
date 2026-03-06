@@ -193,37 +193,57 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     };
   }, []);
 
+  /** Filter out UI controls (toolbar, zoom, minimap, panels) from image export */
+  const exportFilter = useCallback((node: HTMLElement) => {
+    const excludeClasses = [
+      'react-flow__panel',
+      'react-flow__controls',
+      'react-flow__minimap',
+      'react-flow__attribution',
+    ];
+    if (node.classList) {
+      for (const cls of excludeClasses) {
+        if (node.classList.contains(cls)) return false;
+      }
+    }
+    return true;
+  }, []);
+
   const handleExportPNG = useCallback(async () => {
     const el = document.querySelector('.react-flow') as HTMLElement;
     if (!el) return;
     try {
-      const dataUrl = await toPng(el, { backgroundColor: darkMode ? '#0f1520' : '#f5f7fa' });
+      const dataUrl = await toPng(el, {
+        backgroundColor: darkMode ? '#0f1520' : '#f5f7fa',
+        filter: exportFilter,
+      });
       const a = document.createElement('a');
       a.href = dataUrl;
       a.download = `${diagramName || 'diagram'}.png`;
       a.click();
-      // dataUrl is a data URI, not an Object URL — no revocation needed
       toast({ title: 'PNG exportado com sucesso!' });
     } catch {
       toast({ title: 'Erro ao exportar PNG', variant: 'destructive' });
     }
-  }, [darkMode, diagramName]);
+  }, [darkMode, diagramName, exportFilter]);
 
   const handleExportSVG = useCallback(async () => {
     const el = document.querySelector('.react-flow') as HTMLElement;
     if (!el) return;
     try {
-      const dataUrl = await toSvg(el, { backgroundColor: darkMode ? '#0f1520' : '#f5f7fa' });
+      const dataUrl = await toSvg(el, {
+        backgroundColor: darkMode ? '#0f1520' : '#f5f7fa',
+        filter: exportFilter,
+      });
       const a = document.createElement('a');
       a.href = dataUrl;
       a.download = `${diagramName || 'diagram'}.svg`;
       a.click();
-      // dataUrl is a data URI, not an Object URL — no revocation needed
       toast({ title: 'SVG exportado com sucesso!' });
     } catch {
       toast({ title: 'Erro ao exportar SVG', variant: 'destructive' });
     }
-  }, [darkMode, diagramName]);
+  }, [darkMode, diagramName, exportFilter]);
 
   const handleExportMermaid = useCallback(() => {
     const code = exportToMermaid(nodes, edges);
