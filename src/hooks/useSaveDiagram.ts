@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDiagramStore } from '@/store/diagramStore';
 import { useAuth } from '@/hooks/useAuth';
 import { saveDiagram, saveSharedDiagram } from '@/services/diagramService';
+import { clearAutoSave } from '@/hooks/useAutoSave';
 import { toast } from '@/hooks/use-toast';
 
 interface UseSaveDiagramOptions {
@@ -31,11 +32,13 @@ export function useSaveDiagram({ shareToken }: UseSaveDiagramOptions = {}): UseS
     try {
       if (isCollaborator && diagramId) {
         await saveSharedDiagram(diagramId, nodes, edges);
+        clearAutoSave();
         toast({ title: 'Alterações salvas no diagrama compartilhado!' });
       } else {
         const isSharedContext = !!shareToken && !diagramId;
         const record = await saveDiagram(diagramName, nodes, edges, user.id, diagramId);
         setDiagramId(record.id);
+        clearAutoSave();
         if (isSharedContext) {
           toast({
             title: 'Diagrama salvo como cópia!',

@@ -1,3 +1,4 @@
+import React from 'react';
 import { useViewport } from '@xyflow/react';
 import type { DiagramNode, DiagramEdge } from '@/types/diagram';
 import type { SaveStatus } from '@/hooks/useAutoSave';
@@ -8,7 +9,7 @@ interface StatusBarProps {
   saveStatus?: SaveStatus;
 }
 
-export default function StatusBar({ nodes, edges, saveStatus }: StatusBarProps) {
+function StatusBar({ nodes, edges, saveStatus }: StatusBarProps) {
   const { zoom } = useViewport();
 
   return (
@@ -27,3 +28,5 @@ export default function StatusBar({ nodes, edges, saveStatus }: StatusBarProps) 
     </div>
   );
 }
+
+export default React.memo(StatusBar);

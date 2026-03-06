@@ -53,7 +53,7 @@ async function callWithFallback(apiKey: string, messages: { role: string; conten
 const RATE_LIMIT_PER_MINUTE = parseInt(Deno.env.get("AI_RATE_LIMIT_PER_MINUTE") || "10", 10);
 
 async function checkRateLimit(
-  supabaseClient: ReturnType<typeof createClient>,
+  supabaseClient: any,
   userId: string,
   functionName: string,
   corsHeaders: Record<string, string>,

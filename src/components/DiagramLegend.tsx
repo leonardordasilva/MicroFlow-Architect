@@ -1,11 +1,11 @@
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { PROTOCOL_CONFIGS, type EdgeProtocol, type DiagramEdge, type DiagramEdgeData } from '@/types/diagram';
 
 interface DiagramLegendProps {
   edges: DiagramEdge[];
 }
 
-export default function DiagramLegend({ edges }: DiagramLegendProps) {
+function DiagramLegend({ edges }: DiagramLegendProps) {
   const usedProtocols = useMemo(() => {
     const set = new Set<EdgeProtocol>();
     edges.forEach((e) => {
@@ -57,3 +57,5 @@ export default function DiagramLegend({ edges }: DiagramLegendProps) {
     </div>
   );
 }
+
+export default React.memo(DiagramLegend);

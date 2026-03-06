@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ interface NodePropertiesPanelProps {
   onClose: () => void;
 }
 
-export default function NodePropertiesPanel({ nodeId, onClose }: NodePropertiesPanelProps) {
+function NodePropertiesPanel({ nodeId, onClose }: NodePropertiesPanelProps) {
   const nodes = useDiagramStore((s) => s.nodes);
   const setNodes = useDiagramStore((s) => s.setNodes);
 
@@ -210,3 +210,5 @@ export default function NodePropertiesPanel({ nodeId, onClose }: NodePropertiesP
     </div>
   );
 }
+
+export default React.memo(NodePropertiesPanel);

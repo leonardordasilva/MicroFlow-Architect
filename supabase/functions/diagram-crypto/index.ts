@@ -43,7 +43,7 @@ function getKeyBytes(): Uint8Array {
 }
 
 async function importKey(keyBytes: Uint8Array): Promise<CryptoKey> {
-  return crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, [
+  return crypto.subtle.importKey("raw", keyBytes.buffer as ArrayBuffer, "AES-GCM", false, [
     "encrypt",
     "decrypt",
   ]);

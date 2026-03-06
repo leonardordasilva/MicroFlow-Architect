@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Database, Mail, Globe, Trash2, Undo2, Redo2, LayoutGrid,
   Download, Upload, Image, Sparkles, Brain, Moon, Sun, ChevronDown, XCircle,
@@ -76,7 +76,7 @@ function DatabaseDropdown({ onSelect }: { onSelect: (subType: string) => void })
   );
 }
 
-export default function Toolbar({
+function Toolbar({
   onAddNode, onDelete, onClearCanvas, onUndo, onRedo, onAutoLayout,
   onExportPNG, onExportSVG, onExportMermaid, onExportJSON, onImportJSON,
   onOpenAIGenerate, onOpenAIAnalyze,
@@ -241,3 +241,5 @@ export default function Toolbar({
     </div>
   );
 }
+
+export default React.memo(Toolbar);

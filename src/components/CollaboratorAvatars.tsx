@@ -1,3 +1,4 @@
+import React from 'react';
 import type { Collaborator } from '@/hooks/useRealtimeCollab';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -5,7 +6,7 @@ interface CollaboratorAvatarsProps {
   collaborators: Collaborator[];
 }
 
-export default function CollaboratorAvatars({ collaborators }: CollaboratorAvatarsProps) {
+function CollaboratorAvatars({ collaborators }: CollaboratorAvatarsProps) {
   if (collaborators.length === 0) return null;
 
   return (
@@ -33,3 +34,5 @@ export default function CollaboratorAvatars({ collaborators }: CollaboratorAvata
     </div>
   );
 }
+
+export default React.memo(CollaboratorAvatars);

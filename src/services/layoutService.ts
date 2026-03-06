@@ -42,7 +42,7 @@ export function getLayoutedElements(
   return { nodes: layoutedNodes, edges };
 }
 
-// ─── ELK Layout (PERF-04: lazy loaded) ───
+// ─── ELK Layout (Web Worker) ───
 
 const ELK_DIRECTION_MAP: Record<LayoutDirection, string> = {
   LR: 'RIGHT',
@@ -51,21 +51,30 @@ const ELK_DIRECTION_MAP: Record<LayoutDirection, string> = {
   BT: 'UP',
 };
 
-// Singleton: ELK is lazily loaded on first use. In Vite HMR, module re-execution
-// will create a new instance (harmless, just an extra import).
-let elkInstance: import('elkjs').ELK | null = null;
+let worker: Worker | null = null;
+let reqId = 0;
+const pending = new Map<string, { resolve: (v: any) => void; reject: (e: any) => void }>();
+
+function getWorker(): Worker {
+  if (!worker) {
+    worker = new Worker(new URL('../workers/elkWorker.ts', import.meta.url), { type: 'module' });
+    worker.onmessage = (e: MessageEvent<{ id: string; result?: any; error?: string }>) => {
+      const { id, result, error } = e.data;
+      const p = pending.get(id);
+      if (!p) return;
+      pending.delete(id);
+      if (error) p.reject(new Error(error));
+      else p.resolve(result);
+    };
+  }
+  return worker;
+}
 
 export async function getELKLayoutedElements(
   nodes: DiagramNode[],
   edges: DiagramEdge[],
   direction: LayoutDirection = 'LR'
 ): Promise<{ nodes: DiagramNode[]; edges: DiagramEdge[] }> {
-  // PERF-04: Dynamic import — only loads elkjs when first needed
-  if (!elkInstance) {
-    const ELK = (await import('elkjs')).default;
-    elkInstance = new ELK();
-  }
-
   const graph = {
     id: 'root',
     layoutOptions: {
@@ -88,10 +97,20 @@ export async function getELKLayoutedElements(
     })),
   };
 
-  const layouted = await elkInstance.layout(graph);
+  const id = String(++reqId);
+
+  const layouted = await new Promise<any>((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    try {
+      getWorker().postMessage({ id, graph });
+    } catch (err) {
+      pending.delete(id);
+      reject(err);
+    }
+  });
 
   const layoutedNodes = nodes.map((node) => {
-    const elkNode = layouted.children?.find((n) => n.id === node.id);
+    const elkNode = layouted.children?.find((n: any) => n.id === node.id);
     return {
       ...node,
       position: {
