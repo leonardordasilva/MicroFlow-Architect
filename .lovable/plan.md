@@ -1,31 +1,21 @@
-## Plano — Teste E2E Completo com Browser Automation
 
-### Passo 1: Ativar auto-confirm de email
 
-Usar a ferramenta `configure_auth` para ativar auto-confirm em signups, permitindo criar uma conta de teste sem verificação de email. Ao final de todos os testes desativar o auto-confirm
+## Testing the Complete Flow
 
-### Passo 2: Teste E2E via browser automation
+I'm currently in **plan mode** (read-only), so I cannot make code changes or enable auto-confirm for email signups. To test the full flow with browser automation, we need to:
 
-Sequência completa cobrindo todas as funcionalidades:
+### Step 1: Enable auto-confirm for email signups
+This requires switching to implementation mode to use the `configure-auth` tool to enable auto-confirm, allowing me to create a test account programmatically.
 
-1. **Signup** — Navegar à app, criar conta com email/senha de teste
-2. **Login** — Fazer login com as credenciais criadas
-3. **Adicionar nós** — Adicionar Service, Database (Oracle), Queue (Kafka), External (REST) via toolbar
-4. **Renomear diagrama** — Alterar nome no campo de input da toolbar
-5. **Conectar nós** — Criar edges entre os nós arrastando conexões
-6. **Auto Layout** — Aplicar layout ELK (LR) e verificar que os nós foram reposicionados
-7. **Dark Mode** — Alternar tema escuro/claro
-8. **Salvar na nuvem** — Clicar no botão Save e verificar toast de sucesso
-9. **Navegar a Meus Diagramas** — Verificar que o diagrama salvo aparece na lista
-10. **Carregar diagrama salvo** — Clicar no diagrama e verificar que volta ao canvas com os nós
-11. **Exportar JSON** — Verificar que o botão de export funciona
-12. **Node Properties Panel** — Clicar num nó e verificar que o painel de propriedades abre
-13. **Undo/Redo** — Testar desfazer/refazer após uma ação
-14. **Limpar canvas** — Usar "Limpar Diagrama" e confirmar no dialog
-15. **Logout** — Clicar em Sair e verificar que volta à tela de login
+### Step 2: Automated test sequence
+Once auto-confirm is enabled, I will:
+1. Navigate to the app and create a test account (signup with email/password)
+2. Add 2-3 nodes (service, database, queue) via the toolbar
+3. Connect nodes by dragging edges between them
+4. Click "Save" to persist to the cloud
+5. Reload the page and verify the diagram loads with all nodes and edges intact
+6. Export as JSON and verify the output does not contain `selected` or `dragging` fields
 
-### Restrição
+### What I need
+Approve this plan so I can switch to implementation mode, enable auto-confirm, and run the automated browser test.
 
-- Funcionalidades que dependem de IA (Gerar com IA, Analisar Arquitetura) serão testadas apenas até a abertura do modal, sem submeter (para evitar consumo de créditos)
-- Export PNG/SVG serão verificados apenas pela abertura do dropdown (dependem de DOM canvas)
-- Context menu (spawn from node) será testado com right-click em Service node
