@@ -1,21 +1,23 @@
 
 
-## Testing the Complete Flow
+## Correção Cirúrgica — `generate-diagram/index.ts`
 
-I'm currently in **plan mode** (read-only), so I cannot make code changes or enable auto-confirm for email signups. To test the full flow with browser automation, we need to:
+O bug é claro: na linha 249, `AiDiagramSchema.safeParse(diagram)` referencia `diagram` que nunca foi declarada — falta o `JSON.parse(content)`.
 
-### Step 1: Enable auto-confirm for email signups
-This requires switching to implementation mode to use the `configure-auth` tool to enable auto-confirm, allowing me to create a test account programmatically.
+### Alteração única (linhas 230–275)
 
-### Step 2: Automated test sequence
-Once auto-confirm is enabled, I will:
-1. Navigate to the app and create a test account (signup with email/password)
-2. Add 2-3 nodes (service, database, queue) via the toolbar
-3. Connect nodes by dragging edges between them
-4. Click "Save" to persist to the cloud
-5. Reload the page and verify the diagram loads with all nodes and edges intact
-6. Export as JSON and verify the output does not contain `selected` or `dragging` fields
+Substituir todo o bloco de validação e resposta por:
 
-### What I need
-Approve this plan so I can switch to implementation mode, enable auto-confirm, and run the automated browser test.
+1. **Schemas Zod mais robustos** com `AiNodeDataSchema` (inclui `externalCategory`, `internalDatabases`, etc.), `AiNodeSchema`, `AiEdgeSchema`, `AiDiagramOutputSchema` com limites (`min(1)`, `max(100)`, `max(300)`).
+
+2. **Parse + validação corretos**:
+   - `JSON.parse(content)` → atribuído a `rawDiagram`
+   - `AiDiagramOutputSchema.safeParse(rawDiagram)` → resultado validado
+   - Try/catch para capturar erros de JSON.parse separadamente (retorna 422)
+
+3. **Normalização de edges** mantida exatamente como está, mas usando `diagram` (a variável validada) em vez de `diagram2`.
+
+4. **Resposta final** usando `{ nodes: diagram.nodes, edges: finalEdges }`.
+
+Nenhuma outra parte do arquivo é tocada — CORS, auth, rate limiting, system prompt e model cascade permanecem intactos.
 
