@@ -20,7 +20,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Trash2, Pencil, ArrowLeft, FileText, Share2, RefreshCw, Loader2, Users } from 'lucide-react';
+import { Plus, Trash2, Pencil, ArrowLeft, FileText, Share2, RefreshCw, Loader2, Users, Copy } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import ShareDiagramModal from '@/components/ShareDiagramModal';
@@ -224,6 +224,17 @@ export default function MyDiagrams() {
                         aria-label="Compartilhar"
                       >
                         <Share2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost" size="icon" className="h-7 w-7"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          duplicateMutation.mutate({ id: d.id });
+                        }}
+                        aria-label="Duplicar"
+                        disabled={duplicateMutation.isPending}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
                       </Button>
                       <Button
                         variant="ghost" size="icon" className="h-7 w-7"
