@@ -1,21 +1,27 @@
 
 
-## Testing the Complete Flow
+## Duplicar Diagrama a partir da Galeria
 
-I'm currently in **plan mode** (read-only), so I cannot make code changes or enable auto-confirm for email signups. To test the full flow with browser automation, we need to:
+Adicionar um botão "Duplicar" em cada card de diagrama na página "Meus Diagramas", que cria uma cópia independente do diagrama selecionado.
 
-### Step 1: Enable auto-confirm for email signups
-This requires switching to implementation mode to use the `configure-auth` tool to enable auto-confirm, allowing me to create a test account programmatically.
+### Mudanças
 
-### Step 2: Automated test sequence
-Once auto-confirm is enabled, I will:
-1. Navigate to the app and create a test account (signup with email/password)
-2. Add 2-3 nodes (service, database, queue) via the toolbar
-3. Connect nodes by dragging edges between them
-4. Click "Save" to persist to the cloud
-5. Reload the page and verify the diagram loads with all nodes and edges intact
-6. Export as JSON and verify the output does not contain `selected` or `dragging` fields
+**1. `src/services/diagramService.ts`** — Nova função `duplicateDiagram(id, ownerId)`
+- Carrega o diagrama original pelo ID
+- Insere um novo registro com título `"Cópia de {título original}"`, mesmos `nodes` e `edges`, novo `owner_id = ownerId`
+- Retorna o novo registro
 
-### What I need
-Approve this plan so I can switch to implementation mode, enable auto-confirm, and run the automated browser test.
+**2. `src/pages/MyDiagrams.tsx`** — Botão de duplicar no card
+- Adicionar ícone `Copy` do lucide-react nos action buttons do card (ao lado de Share, Rename, Delete)
+- Criar `duplicateMutation` usando a nova função
+- No `onSuccess`, invalidar queries e exibir toast de confirmação
+- Opcionalmente, navegar direto para o canvas com o diagrama duplicado carregado
+
+### Fluxo
+1. Usuário clica no ícone de copiar no card
+2. Mutation chama `duplicateDiagram` → insere cópia no banco
+3. Lista é atualizada automaticamente com o novo diagrama "Cópia de X"
+4. Toast confirma a ação
+
+Nenhuma alteração de banco de dados é necessária — a inserção usa a mesma tabela `diagrams` com as RLS policies existentes.
 
