@@ -225,7 +225,7 @@ export default function MyDiagrams() {
                       Atualizado em {format(new Date(d.updated_at), 'dd/MM/yyyy HH:mm')}
                     </p>
                     <TooltipProvider delayDuration={300}>
-                      <div className="mt-2 flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <div className="mt-2 flex justify-end gap-1">
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
