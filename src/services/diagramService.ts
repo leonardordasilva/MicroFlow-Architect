@@ -272,9 +272,3 @@ export async function shareDiagram(diagramId: string): Promise<string | null> {
   if (error || !data?.shareUrl) return null;
   return data.shareUrl as string;
 }
-  const { data, error } = await supabase.functions.invoke('share-diagram', {
-    body: { diagramId },
-  });
-  if (error || !data?.shareUrl) return null;
-  return data.shareUrl as string;
-}
