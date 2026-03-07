@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Trash2, Pencil, ArrowLeft, FileText, Share2, RefreshCw, Loader2, Users, Copy } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import ShareDiagramModal from '@/components/ShareDiagramModal';
@@ -199,7 +200,7 @@ export default function MyDiagrams() {
                     className="group relative flex cursor-pointer flex-col rounded-xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
                     onClick={() => handleLoad(d)}
                   >
-                    <div className="mb-2 flex items-center justify-between">
+                    <div className="mb-2 flex items-center justify-between pr-28">
                       {editingId === d.id ? (
                         <Input
                           autoFocus
@@ -223,48 +224,70 @@ export default function MyDiagrams() {
                     <p className="mt-1 text-xs text-muted-foreground">
                       Atualizado em {format(new Date(d.updated_at), 'dd/MM/yyyy HH:mm')}
                     </p>
-                    <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Button
-                        variant="ghost" size="icon" className="h-7 w-7"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShareTarget({ diagramId: d.id, ownerId: d.owner_id });
-                        }}
-                        aria-label="Compartilhar"
-                      >
-                        <Share2 className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost" size="icon" className="h-7 w-7"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          duplicateMutation.mutate({ id: d.id });
-                        }}
-                        aria-label="Duplicar"
-                        disabled={duplicateMutation.isPending}
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost" size="icon" className="h-7 w-7"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingId(d.id);
-                          setEditTitle(d.title);
-                        }}
-                        aria-label="Renomear"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost" size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
-                        onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: d.id, ownerId: d.owner_id }); }}
-                        aria-label="Excluir"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                    <TooltipProvider delayDuration={300}>
+                      <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost" size="icon" className="h-7 w-7"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShareTarget({ diagramId: d.id, ownerId: d.owner_id });
+                              }}
+                              aria-label="Compartilhar"
+                            >
+                              <Share2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Compartilhar</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost" size="icon" className="h-7 w-7"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                duplicateMutation.mutate({ id: d.id });
+                              }}
+                              aria-label="Duplicar"
+                              disabled={duplicateMutation.isPending}
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Duplicar</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost" size="icon" className="h-7 w-7"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingId(d.id);
+                                setEditTitle(d.title);
+                              }}
+                              aria-label="Renomear"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Renomear</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost" size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: d.id, ownerId: d.owner_id }); }}
+                              aria-label="Excluir"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Excluir</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TooltipProvider>
                   </div>
                 ))}
               </div>
