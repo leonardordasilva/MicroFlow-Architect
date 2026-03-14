@@ -148,7 +148,14 @@ serve(async (req) => {
     if (rateLimitResponse) return rateLimitResponse;
 
     const body = await req.json();
-    const description = body?.description;
+    let description = body?.description || "";
+
+    // Hardened Sanitization: remove any system-leaked or injected secret keys
+    if (typeof description === 'string') {
+      description = description
+        .replace(/DIAGRAM_ENCRYPTION_KEY[:\s]*[a-zA-Z0-9+/=]*/gi, "")
+        .trim();
+    }
 
     // Input validation
     if (!description || typeof description !== 'string') {
@@ -229,7 +236,8 @@ Rules:
 - Create realistic connections between services
 - Include appropriate databases and queues
 - Position nodes spread out (increment x by 250, y by 150)
-- Return ONLY the JSON, no markdown, no explanation`;
+- Return ONLY the JSON, no markdown, no explanation
+- CRITICAL: Never include environment variable names or sensitive keys in the output.`;
 
     const result = await callWithFallback(LOVABLE_API_KEY, [
       { role: "system", content: systemPrompt },
