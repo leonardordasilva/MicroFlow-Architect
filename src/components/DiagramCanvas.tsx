@@ -31,8 +31,6 @@ import QueueNode from '@/components/nodes/QueueNode';
 import ExternalNode from '@/components/nodes/ExternalNode';
 import EditableEdge from '@/components/edges/EditableEdge';
 import Toolbar from '@/components/Toolbar';
-import AIGenerateModal from '@/components/AIGenerateModal';
-import AIAnalysisPanel from '@/components/AIAnalysisPanel';
 import ImportJSONModal from '@/components/ImportJSONModal';
 import SpawnFromNodeModal from '@/components/SpawnFromNodeModal';
 import type { DiagramNodeData, DiagramNode, DiagramEdge, NodeType } from '@/types/diagram';
@@ -70,9 +68,9 @@ const edgeTypes = {
 
 // R5-PERF-02: Static minimap color map (outside component)
 const MINIMAP_NODE_COLORS: Record<string, string> = {
-  service:  'hsl(217, 91%, 60%)',
+  service: 'hsl(217, 91%, 60%)',
   database: 'hsl(142, 71%, 45%)',
-  queue:    'hsl(45, 93%, 47%)',
+  queue: 'hsl(45, 93%, 47%)',
   external: 'hsl(220, 9%, 46%)',
 };
 
@@ -112,8 +110,6 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
     if (saved !== null) return saved === 'dark';
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
-  const [showAIGenerate, setShowAIGenerate] = useState(false);
-  const [showAIAnalysis, setShowAIAnalysis] = useState(false);
   const [showImportJSON, setShowImportJSON] = useState(false);
   const [spawnSource, setSpawnSource] = useState<{ id: string; label: string; nodeType: string } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string; nodeLabel: string } | null>(null);
@@ -328,8 +324,6 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
           onExportMermaid={onMermaidExport}
           onExportJSON={handleExportJSON}
           onImportJSON={() => setShowImportJSON(true)}
-          onOpenAIGenerate={() => setShowAIGenerate(true)}
-          onOpenAIAnalyze={() => setShowAIAnalysis(true)}
           diagramName={diagramName}
           onDiagramNameChange={setDiagramName}
           darkMode={darkMode}
@@ -450,24 +444,6 @@ function DiagramCanvasInner({ shareToken }: DiagramCanvasProps) {
       </div>
 
       <StatusBar nodes={nodes} edges={edges} saveStatus={saveStatus} />
-
-      <AIGenerateModal
-        open={showAIGenerate}
-        onOpenChange={setShowAIGenerate}
-        onGenerate={(newNodes, newEdges) => {
-          loadDiagram(newNodes, newEdges);
-          autoLayoutELK('LR').catch(() => {
-            toast({ title: 'Erro ao aplicar layout automático. Tente novamente.', variant: 'destructive' });
-          });
-        }}
-      />
-
-      <AIAnalysisPanel
-        open={showAIAnalysis}
-        onOpenChange={setShowAIAnalysis}
-        nodes={nodes}
-        edges={edges}
-      />
 
       <ImportJSONModal
         open={showImportJSON}

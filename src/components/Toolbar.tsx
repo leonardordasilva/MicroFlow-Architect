@@ -23,8 +23,6 @@ interface ToolbarProps {
   onExportMermaid: () => void;
   onExportJSON: () => void;
   onImportJSON: () => void;
-  onOpenAIGenerate: () => void;
-  onOpenAIAnalyze: () => void;
   diagramName: string;
   onDiagramNameChange: (name: string) => void;
   darkMode: boolean;
@@ -79,7 +77,6 @@ function DatabaseDropdown({ onSelect }: { onSelect: (subType: string) => void })
 function Toolbar({
   onAddNode, onDelete, onClearCanvas, onUndo, onRedo, onAutoLayout,
   onExportPNG, onExportSVG, onExportMermaid, onExportJSON, onImportJSON,
-  onOpenAIGenerate, onOpenAIAnalyze,
   diagramName, onDiagramNameChange,
   darkMode, onToggleDarkMode,
 }: ToolbarProps) {
@@ -225,11 +222,6 @@ function Toolbar({
         </DropdownMenuContent>
       </DropdownMenu>
       <ToolbarButton icon={Upload} label="Importar JSON" onClick={onImportJSON} />
-
-      <Separator orientation="vertical" className="h-6" />
-
-      <ToolbarButton icon={Sparkles} label="Gerar com IA" onClick={onOpenAIGenerate} variant="outline" />
-      <ToolbarButton icon={Brain} label="Analisar Arquitetura" onClick={onOpenAIAnalyze} variant="outline" />
 
       <Separator orientation="vertical" className="h-6" />
 
