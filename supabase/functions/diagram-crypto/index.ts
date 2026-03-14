@@ -103,26 +103,43 @@ serve(async (req) => {
   try {
     // ── Authentication ──────────────────────────────────────
     const authHeader = req.headers.get("Authorization");
+
+    // Log for debugging (will appear in Supabase Logs)
+    console.log("Auth Header present:", !!authHeader);
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+    console.log("SUPABASE_URL configured:", !!SUPABASE_URL);
+    console.log("SUPABASE_ANON_KEY configured:", !!SUPABASE_ANON_KEY);
+
     if (!authHeader?.startsWith("Bearer ")) {
+      console.error("Missing or invalid Authorization header");
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Unauthorized", details: "Missing Bearer token" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      SUPABASE_URL ?? "",
+      SUPABASE_ANON_KEY ?? "",
       { global: { headers: { Authorization: authHeader } } },
     );
 
     const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+
     if (userError || !userData?.user) {
+      console.error("Auth helper error:", userError?.message || "No user found");
       return new Response(
-        JSON.stringify({ error: "Invalid token" }),
+        JSON.stringify({
+          error: "Invalid token",
+          details: userError?.message || "User not found in session",
+          project: SUPABASE_URL
+        }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
+    console.log("Authenticated user:", userData.user.id);
 
     // ── Business logic ──────────────────────────────────────
     const body = await req.json();
@@ -133,6 +150,7 @@ serve(async (req) => {
     };
 
     if (!action || !["encrypt", "decrypt"].includes(action)) {
+      console.error("Invalid action requested:", action);
       return new Response(
         JSON.stringify({ error: 'action must be "encrypt" or "decrypt"' }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
